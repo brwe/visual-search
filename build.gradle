@@ -1,9 +1,28 @@
+/*
+ * Copyright 2017 a2tirb
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 buildscript {
+    ext {
+        springBootVersion = '2.0.0.BUILD-SNAPSHOT'
+    }
     repositories {
-        mavenCentral()
+        maven { url 'https://repo.spring.io/libs-snapshot' }
     }
     dependencies {
-        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.5.8.RELEASE")
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
     }
 }
 
@@ -11,30 +30,50 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
 
-jar {
-    baseName = 'gs-spring-boot'
-    version =  '0.1.0'
-}
 
 repositories {
+    maven { url "https://repo.spring.io/snapshot" }
+    maven { url "https://repo.spring.io/milestone" }
+    maven { url "https://repo.spring.io/release" }
+    maven {
+        url 'https://dl.bintray.com/palantir/releases' // docker-compose-rule is published on bintray
+    }
     mavenCentral()
+}
+
+jar {
+    baseName = 'visual-serach-spring-boot'
+    version = '0.1.0'
 }
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-dependencies {
-    // tag::jetty[]
-    compile("org.springframework.boot:spring-boot-starter-web") {
-        exclude module: "spring-boot-starter-tomcat"
+ext['elasticsearch.version'] = '5.6.3'
+
+configurations {
+    all {
+        exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
     }
-    compile("org.springframework.boot:spring-boot-starter-jetty")
-    // end::jetty[]
-    // tag::actuator[]
-    compile("org.springframework.boot:spring-boot-starter-actuator")
-    // end::actuator[]
-    testCompile("junit:junit")
-    testCompile("org.springframework.boot:spring-boot-starter-test")
+}
+
+dependencies {
+
+    compile("org.springframework.boot:spring-boot-starter-webflux:2.0.0.BUILD-SNAPSHOT")
+    compile 'org.springframework.boot:spring-boot-starter-jetty:2.0.0.BUILD-SNAPSHOT'
+    compile("org.springframework.boot:spring-boot-starter-actuator:2.0.0.BUILD-SNAPSHOT")
+    compile 'org.apache.httpcomponents:httpclient:4.3.6'
+    compile 'org.apache.httpcomponents:httpasyncclient:4.0.2'
+    compile 'org.apache.httpcomponents:httpmime:4.3.6'
+    compile 'org.json:json:20140107'
+    compile group: 'commons-io', name: 'commons-io', version: '2.4'
+
+    testCompile 'commons-io:commons-io:2.4'
+    testCompile("org.springframework.boot:spring-boot-starter-test:2.0.0.BUILD-SNAPSHOT")
+    testCompile("io.projectreactor:reactor-test:3.1.1.RELEASE")
+    testCompile("org.apache.logging.log4j:log4j-core:2.9.1")
+    testCompile 'com.palantir.docker.compose:docker-compose-rule-junit4:0.32.1'
 }
 

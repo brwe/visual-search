@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+build/
+out/
+visual-search.iml
+visual-search.ipr
+visual-search.iws
+.DS_Store
+data/
+esdata/
+logstash-5*

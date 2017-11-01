@@ -1,0 +1,12 @@
+version: '2.1'
+services:
+  nginx:
+    container_name: 'nginx'
+    image: nginx
+    environment:
+      - NGINX_PORT=80
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/data:/data
