@@ -24,14 +24,16 @@ import org.springframework.web.reactive.function.BodyExtractors;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 public abstract class Handler<Request, Response> {
 
-    final Logger logger = LoggerFactory.getLogger(this.getClass());
-    final ImageRetrieveService imageRetrieveService;
-    final ElasticService elasticService;
+    protected final Logger logger = LoggerFactory.getLogger(this.getClass());
+    protected final ImageRetrieveService imageRetrieveService;
+    protected final ElasticService elasticService;
 
     final BodyExtractor<Mono<Request>, ReactiveHttpInputMessage> requestExtractor;
 
@@ -50,7 +52,7 @@ public abstract class Handler<Request, Response> {
                 .body(responsePublisher.resultMono, responsePublisher.responseClass));
     }
 
-    abstract Mono<ResponsePublisher> computeResponse(Mono<Request> indexImageRequestMono);
+    protected abstract Mono<ResponsePublisher> computeResponse(Mono<Request> indexImageRequestMono);
 
     public static class ErrorMessage {
         public String message;

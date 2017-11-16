@@ -18,6 +18,8 @@ package visualsearch.service;
 
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

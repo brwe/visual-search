@@ -38,14 +38,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import static visualsearch.service.ElasticService.ELASTIC_HOST;
-import static visualsearch.service.ElasticService.ELASTIC_PORT;
+import static visualsearch.service.services.ElasticService.ELASTIC_HOST;
+import static visualsearch.service.services.ElasticService.ELASTIC_PORT;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
 import static io.netty.handler.codec.http.HttpHeaders.Values.APPLICATION_JSON;
 import static org.hamcrest.MatcherAssert.assertThat;

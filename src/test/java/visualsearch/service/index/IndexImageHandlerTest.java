@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
-package visualsearch.service;
+package visualsearch.service.index;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import visualsearch.image.ProcessedImage;
 import org.junit.Test;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
+import visualsearch.service.ResponsePublisher;
+import visualsearch.service.index.IndexImageHandler;
+import visualsearch.service.index.IndexImageRequest;
+import visualsearch.service.index.IndexImageResponse;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.time.Duration;

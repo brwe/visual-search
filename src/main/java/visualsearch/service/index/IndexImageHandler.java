@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package visualsearch.service;
+package visualsearch.service.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +26,10 @@ import org.springframework.web.reactive.function.BodyExtractors;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.Handler;
+import visualsearch.service.services.ImageRetrieveService;
+import visualsearch.service.ResponsePublisher;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -41,7 +45,7 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
     }
 
     @Override
-    Mono<ResponsePublisher> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
+    protected Mono<ResponsePublisher> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
         ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
         return indexImageRequestMono.flatMap(indexImageRequest -> {
                     if (indexImageRequest.imageUrl == null) {

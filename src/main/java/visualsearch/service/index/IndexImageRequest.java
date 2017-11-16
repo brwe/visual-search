@@ -1,4 +1,4 @@
-package visualsearch.service;
+package visualsearch.service.index;
 
 public class IndexImageRequest {
     public String imageUrl;

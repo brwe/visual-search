@@ -14,47 +14,57 @@
  * limitations under the License.
  */
 
-package visualsearch.service;
+package visualsearch.service.services;
 
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.entity.BasicHttpEntity;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.PreDestroy;
+import java.io.ByteArrayInputStream;
+import java.io.Closeable;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
-import static org.springframework.http.MediaType.IMAGE_JPEG_VALUE;
+import static io.netty.handler.codec.http.HttpHeaders.Values.APPLICATION_JSON;
 
 @Service
-public class ImageRetrieveService implements AutoCloseable {
+public class ElasticService implements Closeable {
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    public static final String ELASTIC_HOST = "ELASTIC_HOST";
+    public static final String ELASTIC_PORT = "ELASTIC_PORT";
+    public static String INDEX = "images";
+    public static String TYPE = "processed_images";
 
-    // cannot use this client probably because of https://github.com/reactor/reactor-netty/issues/119
-    // check in again in a few weeks?
-    // private WebClient client = WebClient.create();
+    private final HttpHost httpHost;
+
     private final CloseableHttpAsyncClient client = HttpAsyncClients.createDefault();
 
-    public ImageRetrieveService() {
+    public ElasticService() {
+        httpHost = new HttpHost(System.getProperty(ELASTIC_HOST), Integer.parseInt(System.getProperty(ELASTIC_PORT)));
         client.start();
+        logger.info("Using elastic host " + System.getProperty(ELASTIC_HOST));
+        logger.info("Using elastic port " + System.getProperty(ELASTIC_PORT));
     }
 
-
-    public Mono<ImageRetrieveService.ImageResponse> fetchImage(FetchImageRequest request) {
-
-        return Mono.<ImageResponse>create(sink -> {
+    public Mono<ElasticResponse> post(String body) {
+        return Mono.<ElasticResponse>create(sink -> {
             FutureCallback<HttpResponse> callback = new FutureCallback<HttpResponse>() {
 
                 @Override
                 public void completed(HttpResponse result) {
 
                     try {
-                        sink.success(new ImageResponse(ByteBuffer.wrap(EntityUtils.toByteArray(result.getEntity())), HttpStatus.resolve(result.getStatusLine().getStatusCode())));
+                        sink.success(new ElasticResponse(EntityUtils.toString(result.getEntity()), result.getStatusLine().getStatusCode()));
                     } catch (IOException e) {
                         sink.error(e);
                     }
@@ -70,32 +80,17 @@ public class ImageRetrieveService implements AutoCloseable {
                     sink.error(new Exception("request was cancelled"));
                 }
 
+
             };
-            HttpPost getRequest = new HttpPost(request.imageUrl);
-            getRequest.addHeader("accept", IMAGE_JPEG_VALUE);
-            client.execute(getRequest, callback);
+            logger.debug("sending  " + body + " to elastic");
+            HttpPost request = new HttpPost(httpHost.toURI() + "/" + INDEX + "/" + TYPE);
+            BasicHttpEntity entity = new BasicHttpEntity();
+            entity.setContent(new ByteArrayInputStream(body.getBytes()));
+            request.setEntity(entity);
+            request.addHeader("accept", APPLICATION_JSON);
+            client.execute(request, callback);
 
         });
-    }
-
-    public static class ImageResponse {
-
-        private final ByteBuffer body;
-        private final HttpStatus statusCode;
-
-        public ImageResponse(ByteBuffer body, HttpStatus statusCode) {
-
-            this.body = body;
-            this.statusCode = statusCode;
-        }
-
-        public ByteBuffer body() {
-            return body;
-        }
-
-        public HttpStatus statusCode() {
-            return statusCode;
-        }
     }
 
     @Override
@@ -108,27 +103,22 @@ public class ImageRetrieveService implements AutoCloseable {
         }
     }
 
-    public static class FetchImageRequest {
-        String imageUrl;
+    public static class ElasticResponse {
+        HttpStatus status;
+        String body;
 
-        public FetchImageRequest(String imageUrl) {
-
-            this.imageUrl = imageUrl;
+        public ElasticResponse(String body, int status) {
+            this.body = body;
+            this.status = HttpStatus.resolve(status);
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            FetchImageRequest that = (FetchImageRequest) o;
-
-            return imageUrl != null ? imageUrl.equals(that.imageUrl) : that.imageUrl == null;
+        public String getBody() throws IOException {
+            return body;
         }
 
-        @Override
-        public int hashCode() {
-            return imageUrl != null ? imageUrl.hashCode() : 0;
+        public HttpStatus getHttpStatus() {
+            return status;
         }
     }
+
 }
