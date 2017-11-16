@@ -58,7 +58,7 @@ public class ImageRetrieveIntegTest {
     public void testImageRetrieveServiceWorks() throws IOException {
         try (CloseableHttpClient client = HttpClients.createDefault();) {
 
-            HttpGet request = new HttpGet("http://localhost/best_tasting_colors_2x.jpg");
+            HttpGet request = new HttpGet("http://localhost/test.jpg");
             request.addHeader("accept", IMAGE_JPEG_VALUE);
             try (CloseableHttpResponse response = client.execute(request)) {
                 assertThat(response.getStatusLine().getStatusCode(), equalTo(HttpStatus.OK.value()));

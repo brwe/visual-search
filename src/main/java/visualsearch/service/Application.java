@@ -27,17 +27,6 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
-
-/**
- * https://bclozel.github.io/webflux-workshop/
- * https://spring.io/blog/2016/07/20/notes-on-reactive-programming-part-iii-a-simple-http-server-application
- * https://docs.spring.io/spring/docs/5.0.0.BUILD-SNAPSHOT/spring-framework-reference/reactive-web.html
- * https://spring.io/blog/2016/07/28/reactive-programming-with-spring-5-0-m1
- * https://github.com/openimages/dataset
- * http://projectreactor.io/docs/core/release/reference/docs/index.html
- */
-
-
 @SpringBootApplication
 public class Application {
 
