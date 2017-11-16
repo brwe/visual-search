@@ -38,13 +38,13 @@ repositories {
     maven { url "https://repo.spring.io/milestone" }
     maven { url "https://repo.spring.io/release" }
     maven {
-        url 'https://dl.bintray.com/palantir/releases' // docker-compose-rule is published on bintray
+        url "https://dl.bintray.com/palantir/releases" // docker-compose-rule is published on bintray
     }
     mavenCentral()
 }
 
 jar {
-    baseName = 'visual-serach-spring-boot'
+    baseName = 'visual-search-spring-boot'
     version = '0.1.0'
 }
 
@@ -53,27 +53,20 @@ targetCompatibility = 1.8
 
 ext['elasticsearch.version'] = '5.6.3'
 
-configurations {
-    all {
-        exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
-    }
-}
-
 dependencies {
 
     compile("org.springframework.boot:spring-boot-starter-webflux:2.0.0.BUILD-SNAPSHOT")
-    compile 'org.springframework.boot:spring-boot-starter-jetty:2.0.0.BUILD-SNAPSHOT'
+    compile("org.springframework.boot:spring-boot-starter-jetty:2.0.0.BUILD-SNAPSHOT")
     compile("org.springframework.boot:spring-boot-starter-actuator:2.0.0.BUILD-SNAPSHOT")
-    compile 'org.apache.httpcomponents:httpclient:4.3.6'
-    compile 'org.apache.httpcomponents:httpasyncclient:4.0.2'
-    compile 'org.apache.httpcomponents:httpmime:4.3.6'
-    compile 'org.json:json:20140107'
-    compile group: 'commons-io', name: 'commons-io', version: '2.4'
+    compile("org.apache.httpcomponents:httpclient:4.3.6")
+    compile("org.apache.httpcomponents:httpasyncclient:4.0.2")
+    compile("org.apache.httpcomponents:httpmime:4.3.6")
+    compile("org.json:json:20140107")
+    compile("commons-io:commons-io:2.4")
 
-    testCompile 'commons-io:commons-io:2.4'
     testCompile("org.springframework.boot:spring-boot-starter-test:2.0.0.BUILD-SNAPSHOT")
     testCompile("io.projectreactor:reactor-test:3.1.1.RELEASE")
     testCompile("org.apache.logging.log4j:log4j-core:2.9.1")
-    testCompile 'com.palantir.docker.compose:docker-compose-rule-junit4:0.32.1'
+    testCompile("com.palantir.docker.compose:docker-compose-rule-junit4:0.32.1")
 }
 
