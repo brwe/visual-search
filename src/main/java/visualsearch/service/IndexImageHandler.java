@@ -18,50 +18,29 @@ package visualsearch.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import visualsearch.image.ProcessImage;
-import visualsearch.image.ProcessedImage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyExtractor;
 import org.springframework.web.reactive.function.BodyExtractors;
-import org.springframework.web.reactive.function.server.ServerRequest;
-import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
+import visualsearch.image.ProcessImage;
+import visualsearch.image.ProcessedImage;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-
 @Component
-public class IndexImageHandler {
+public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResponse> {
 
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    private ImageRetrieveService imageRetrieveService;
-    private ElasticService elasticService;
-
-    final BodyExtractor<Mono<IndexImageRequest>, ReactiveHttpInputMessage> requestExtractor = BodyExtractors.toMono(IndexImageHandler.IndexImageRequest.class);
+    final BodyExtractor<Mono<IndexImageRequest>, ReactiveHttpInputMessage> requestExtractor = BodyExtractors.toMono(IndexImageRequest.class);
 
     public IndexImageHandler(ImageRetrieveService imageRetrieveService, ElasticService elasticService) {
-        this.imageRetrieveService = imageRetrieveService;
-        this.elasticService = elasticService;
+        super(imageRetrieveService, elasticService, IndexImageRequest.class);
     }
 
-    public Mono<ServerResponse> fetchAndIndex(ServerRequest request) {
-        Mono<IndexImageRequest> indexImageRequestMono = request.body(requestExtractor);
-        Mono<ResponsePublisher> responsePublisherMono = computeResponse(indexImageRequestMono);
-        return responsePublisherMono.flatMap(responsePublisher -> ServerResponse
-                .status(responsePublisher.status)
-                .contentType(APPLICATION_JSON)
-                .body(responsePublisher.resultMono, responsePublisher.responseClass));
-
-
-    }
-
+    @Override
     Mono<ResponsePublisher> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
         ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
         return indexImageRequestMono.flatMap(indexImageRequest -> {
@@ -72,21 +51,21 @@ public class IndexImageHandler {
                     } else {
                         resultBuilder.imageUrl(indexImageRequest.imageUrl);
                         try {
-                            logger.debug("Processing visualsearch.image " + indexImageRequest.imageUrl);
-                            return imageRetrieveService.getImage(indexImageRequest)
+                            logger.debug("Processing image " + indexImageRequest.imageUrl);
+                            return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(indexImageRequest.imageUrl))
                                     .flatMap(clientResponse -> {
                                         if (clientResponse.statusCode() != HttpStatus.OK) {
-                                            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching visualsearch.image returned error")),
+                                            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching image returned error")),
                                                     ErrorMessage.class,
                                                     clientResponse.statusCode()));
                                         } else {
-                                            logger.debug("got response for visualsearch.image " + indexImageRequest.imageUrl);
+                                            logger.debug("got response for image " + indexImageRequest.imageUrl);
                                             return processAndStoreImage(clientResponse.body(), resultBuilder);
 
                                         }
                                     });
                         } catch (Exception e) {
-                            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching visualsearch.image failed: " + e.getMessage())),
+                            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching image failed: " + e.getMessage())),
                                     ErrorMessage.class,
                                     HttpStatus.INTERNAL_SERVER_ERROR));
                         }
@@ -97,9 +76,9 @@ public class IndexImageHandler {
 
 
     private Mono<ResponsePublisher> processAndStoreImage(ByteBuffer byteBuffer, ProcessedImage.Builder builder) {
-        logger.debug("processing bytes for visualsearch.image " + builder.build().imageUrl);
+        logger.debug("processing bytes for image " + builder.build().imageUrl);
         ProcessedImage processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
-        logger.debug("processed bytes for visualsearch.image " + builder.build().imageUrl);
+        logger.debug("processed bytes for image " + builder.build().imageUrl);
         return storeResultInElasticsearch(processedImage);
     }
 
@@ -140,53 +119,4 @@ public class IndexImageHandler {
         );
     }
 
-    public static class IndexImageRequest {
-        public String imageUrl;
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            IndexImageRequest that = (IndexImageRequest) o;
-
-            return imageUrl != null ? imageUrl.equals(that.imageUrl) : that.imageUrl == null;
-        }
-
-        @Override
-        public int hashCode() {
-            return imageUrl != null ? imageUrl.hashCode() : 0;
-        }
-
-        public IndexImageRequest setUrl(String url) {
-            this.imageUrl = url;
-            return this;
-        }
-    }
-
-
-    public static class ErrorMessage {
-        public String message;
-
-        public ErrorMessage(String message) {
-            this.message = message;
-        }
-    }
-
-    public static class ResponsePublisher<T> {
-        Mono<T> resultMono;
-        Class<T> responseClass;
-        HttpStatus status;
-
-        public ResponsePublisher(Mono<T> resultMono, Class<T> responseClass, HttpStatus status) {
-
-            this.resultMono = resultMono;
-            this.responseClass = responseClass;
-            this.status = status;
-        }
-    }
-
-    public static class IndexImageResponse {
-        public String _id;
-    }
 }

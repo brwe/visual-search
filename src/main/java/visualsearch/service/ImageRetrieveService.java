@@ -45,7 +45,7 @@ public class ImageRetrieveService implements AutoCloseable {
     }
 
 
-    public Mono<ImageRetrieveService.ImageResponse> getImage(IndexImageHandler.IndexImageRequest request) {
+    public Mono<ImageRetrieveService.ImageResponse> fetchImage(FetchImageRequest request) {
 
         return Mono.<ImageResponse>create(sink -> {
             FutureCallback<HttpResponse> callback = new FutureCallback<HttpResponse>() {
@@ -105,6 +105,30 @@ public class ImageRetrieveService implements AutoCloseable {
             client.close();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static class FetchImageRequest {
+        String imageUrl;
+
+        public FetchImageRequest(String imageUrl) {
+
+            this.imageUrl = imageUrl;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            FetchImageRequest that = (FetchImageRequest) o;
+
+            return imageUrl != null ? imageUrl.equals(that.imageUrl) : that.imageUrl == null;
+        }
+
+        @Override
+        public int hashCode() {
+            return imageUrl != null ? imageUrl.hashCode() : 0;
         }
     }
 }

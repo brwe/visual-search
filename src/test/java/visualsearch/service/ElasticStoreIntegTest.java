@@ -86,10 +86,9 @@ public class ElasticStoreIntegTest {
 
     @Test
     public void testImage() throws IOException {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         doReturn(getImageClientResponse(Duration.ZERO))
-                .when(imageRetrieveService).getImage(indexImageRequest);
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
 
         String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)

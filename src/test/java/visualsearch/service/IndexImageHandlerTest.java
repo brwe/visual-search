@@ -38,48 +38,50 @@ public class IndexImageHandlerTest {
 
     @Test
     public void testJsonResponseContainsId() throws IOException {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         String elasticId = "123";
         String storedBody = new ObjectMapper()
-                .writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(indexImageRequest.imageUrl).build());
+                .writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(fetchImageRequest.imageUrl).build());
         ElasticService elasticService = mock(ElasticService.class);
         doReturn(createElasticPutResponse(Duration.ZERO, HttpStatus.CREATED, elasticId))
                 .when(elasticService).post(storedBody);
 
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
         doReturn(getImageClientResponse(Duration.ZERO))
-                .when(imageRetrieveService).getImage(indexImageRequest);
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
         IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, elasticService);
 
-        IndexImageHandler.ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
-        assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageHandler.IndexImageResponse.class));
-        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageHandler.IndexImageResponse.class));
-        IndexImageHandler.IndexImageResponse response = (IndexImageHandler.IndexImageResponse) imageIndexServerResponse.resultMono.block();
+        IndexImageRequest indexImageRequest = new IndexImageRequest();
+        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
+        assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageResponse.class));
+        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageResponse.class));
+        IndexImageResponse response = (IndexImageResponse) imageIndexServerResponse.resultMono.block();
         assertThat(response._id, equalTo(elasticId));
     }
 
     @Test
     public void testImageRetrieveException() throws IOException {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         String elasticId = "123";
         String storedBody = new ObjectMapper()
-                .writeValueAsString(ProcessedImage.builder().capacity(20).imageUrl(indexImageRequest.imageUrl).build());
+                .writeValueAsString(ProcessedImage.builder().capacity(20).imageUrl(fetchImageRequest.imageUrl).build());
         ElasticService elasticService = mock(ElasticService.class);
         doReturn(createElasticPutResponse(Duration.ZERO, HttpStatus.CREATED, elasticId))
                 .when(elasticService).post(storedBody);
 
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
         doThrow(new IllegalArgumentException("No can do.")).
-                when(imageRetrieveService).getImage(indexImageRequest);
+                when(imageRetrieveService).fetchImage(fetchImageRequest);
         IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, elasticService);
 
-        IndexImageHandler.ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
+        IndexImageRequest indexImageRequest = new IndexImageRequest();
+        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
         assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageHandler.ErrorMessage.class));
         assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageHandler.ErrorMessage.class));
         IndexImageHandler.ErrorMessage response = (IndexImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("fetching visualsearch.image failed: No can do."));
+        assertThat(response.message, equalTo("fetching image failed: No can do."));
     }
 
 }

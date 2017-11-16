@@ -78,13 +78,12 @@ public class HelloControllerTest {
 
     @Test
     public void testImage() throws IOException {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(indexImageRequest.imageUrl).build());
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
+        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(fetchImageRequest.imageUrl).build());
         doReturn(createElasticPutResponse(HttpStatus.CREATED))
                 .when(elasticService).post(storedBody);
         doReturn(getImageClientResponse(Duration.ZERO))
-                .when(imageRetrieveService).getImage(indexImageRequest);
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
         String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
@@ -97,21 +96,18 @@ public class HelloControllerTest {
 
     @Test
     public void testImageResponseRelayed() {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
-                .when(imageRetrieveService).getImage(indexImageRequest);
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
         this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
                 .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
-                .expectBody(String.class).isEqualTo("{\"message\":\"fetching visualsearch.image returned error\"}");
+                .expectBody(String.class).isEqualTo("{\"message\":\"fetching image returned error\"}");
     }
 
     @Test
     public void testImageWithFaultyUrl() {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
         this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"image_url1\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
@@ -121,13 +117,12 @@ public class HelloControllerTest {
 
     @Test
     public void testImageParallel() throws InterruptedException, IOException {
-        IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(indexImageRequest.imageUrl).build());
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
+        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(fetchImageRequest.imageUrl).build());
         doReturn(createElasticPutResponse(HttpStatus.CREATED))
                 .when(elasticService).post(storedBody);
         doReturn(getImageClientResponse(Duration.ofMillis(1000)))
-                .when(imageRetrieveService).getImage(indexImageRequest);
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
         CountDownLatch latch = new CountDownLatch(1);
         final WebTestClient threadClient = webClient;
         List<Thread> threads = new ArrayList();
