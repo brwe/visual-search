@@ -37,6 +37,6 @@ public class Application {
 
     @Bean
     public RouterFunction<ServerResponse> imageRouterFunction(IndexImageHandler imageHandler) {
-        return route(POST("/visualsearch/image"), imageHandler::fetchAndIndex);
+        return route(POST("/image"), imageHandler::fetchAndIndex);
     }
 }

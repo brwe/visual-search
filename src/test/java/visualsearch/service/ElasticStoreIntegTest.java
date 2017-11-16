@@ -91,7 +91,7 @@ public class ElasticStoreIntegTest {
         doReturn(getImageClientResponse(Duration.ZERO))
                 .when(imageRetrieveService).getImage(indexImageRequest);
 
-        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/visualsearch/image").contentType(MediaType.APPLICATION_JSON)
+        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
                 .expectStatus().isEqualTo(HttpStatus.CREATED)

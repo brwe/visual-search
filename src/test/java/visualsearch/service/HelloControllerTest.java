@@ -85,7 +85,7 @@ public class HelloControllerTest {
                 .when(elasticService).post(storedBody);
         doReturn(getImageClientResponse(Duration.ZERO))
                 .when(imageRetrieveService).getImage(indexImageRequest);
-        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/visualsearch/image").contentType(MediaType.APPLICATION_JSON)
+        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
                 .expectStatus().isEqualTo(HttpStatus.CREATED)
@@ -101,7 +101,7 @@ public class HelloControllerTest {
         indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
         doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
                 .when(imageRetrieveService).getImage(indexImageRequest);
-        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/visualsearch/image").contentType(MediaType.APPLICATION_JSON)
+        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
                 .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
@@ -112,7 +112,7 @@ public class HelloControllerTest {
     public void testImageWithFaultyUrl() {
         IndexImageHandler.IndexImageRequest indexImageRequest = new IndexImageHandler.IndexImageRequest();
         indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/visualsearch/image").contentType(MediaType.APPLICATION_JSON)
+        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"image_url1\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
                 .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
@@ -142,7 +142,7 @@ public class HelloControllerTest {
                 }
                 try {
 
-                    String bodyString = threadClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/visualsearch/image").contentType(MediaType.APPLICATION_JSON)
+                    String bodyString = threadClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
                             .accept(MediaType.APPLICATION_JSON)
                             .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
                             .expectStatus().isEqualTo(HttpStatus.CREATED)
