@@ -42,9 +42,6 @@ import static org.springframework.http.MediaType.IMAGE_JPEG_VALUE;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class ImageRetrieveIntegTest {
 
-    @Autowired
-    private WebTestClient webClient;
-
     @MockBean
     private ElasticService elasticService;
 
