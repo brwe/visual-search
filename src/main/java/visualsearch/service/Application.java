@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import visualsearch.service.index.IndexImageHandler;
+import visualsearch.service.search.SearchImageHandler;
 
 import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
@@ -37,7 +38,12 @@ public class Application {
     }
 
     @Bean
-    public RouterFunction<ServerResponse> indexImageRouterFunction(IndexImageHandler imageHandler) {
-        return route(POST("/image"), imageHandler::handle);
+    public RouterFunction<ServerResponse> indexImageRouterFunction(IndexImageHandler indexImageHandler) {
+        return route(POST("/image"), indexImageHandler::handle);
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> searchImageRouterFunction(SearchImageHandler searchImageHandler) {
+        return route(POST("/image_search"), searchImageHandler::handle);
     }
 }

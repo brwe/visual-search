@@ -14,55 +14,51 @@
  * limitations under the License.
  */
 
-package visualsearch.service.index;
+package visualsearch.service.search;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.json.JSONObject;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.BodyExtractor;
-import org.springframework.web.reactive.function.BodyExtractors;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
-import visualsearch.service.services.ElasticService;
 import visualsearch.service.Handler;
-import visualsearch.service.services.ImageRetrieveService;
 import visualsearch.service.ResponsePublisher;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 
 @Component
-public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResponse> {
+public class SearchImageHandler extends Handler<SearchImageRequest, String> {
 
-    public IndexImageHandler(ImageRetrieveService imageRetrieveService, ElasticService elasticService) {
-        super(imageRetrieveService, elasticService, IndexImageRequest.class);
+
+    public SearchImageHandler(ImageRetrieveService imageRetrieveService, ElasticService elasticService) {
+        super(imageRetrieveService, elasticService, SearchImageRequest.class);
     }
 
     @Override
-    protected Mono<ResponsePublisher> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
+    protected Mono<ResponsePublisher> computeResponse(Mono<SearchImageRequest> searchImageRequestMono) {
         ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
-        return indexImageRequestMono.flatMap(indexImageRequest -> {
-                    if (indexImageRequest.imageUrl == null) {
+        return searchImageRequestMono.flatMap(searchImageRequest -> {
+                    if (searchImageRequest.imageUrl == null) {
                         return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("imageUrl was not specified in request")),
                                 ErrorMessage.class,
                                 HttpStatus.BAD_REQUEST));
                     } else {
-                        resultBuilder.imageUrl(indexImageRequest.imageUrl);
+                        resultBuilder.imageUrl(searchImageRequest.imageUrl);
                         try {
-                            logger.debug("Processing image " + indexImageRequest.imageUrl);
-                            return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(indexImageRequest.imageUrl))
+                            logger.debug("Processing image " + searchImageRequest.imageUrl);
+                            return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(searchImageRequest.imageUrl))
                                     .flatMap(clientResponse -> {
                                         if (clientResponse.statusCode() != HttpStatus.OK) {
                                             return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching image returned error")),
                                                     ErrorMessage.class,
                                                     clientResponse.statusCode()));
                                         } else {
-                                            logger.debug("got response for image " + indexImageRequest.imageUrl);
-                                            return processAndStoreImage(clientResponse.body(), resultBuilder);
+                                            logger.debug("got response for image " + searchImageRequest.imageUrl);
+                                            return processAndSearchImage(clientResponse.body(), resultBuilder);
 
                                         }
                                     });
@@ -77,40 +73,29 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
     }
 
 
-    private Mono<ResponsePublisher> processAndStoreImage(ByteBuffer byteBuffer, ProcessedImage.Builder builder) {
+    private Mono<ResponsePublisher> processAndSearchImage(ByteBuffer byteBuffer, ProcessedImage.Builder builder) {
         logger.debug("processing bytes for image " + builder.build().imageUrl);
         ProcessedImage processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
         logger.debug("processed bytes for image " + builder.build().imageUrl);
-        return storeResultInElasticsearch(processedImage);
+        return searchSimilarImagesInElasticsearch(processedImage);
     }
 
-    private Mono<ResponsePublisher> storeResultInElasticsearch(ProcessedImage processedImage) {
-        ObjectMapper toJson = new ObjectMapper();
-        String documentBody;
-        try {
-            documentBody = toJson.writeValueAsString(processedImage);
-        } catch (JsonProcessingException e) {
-            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to write visualsearch.image processing result to elastic")),
-                    ErrorMessage.class,
-                    HttpStatus.INTERNAL_SERVER_ERROR));
-        }
-        return elasticService.post(documentBody).map(
+    private Mono<ResponsePublisher> searchSimilarImagesInElasticsearch(ProcessedImage processedImage) {
+        String queryBody;
+        queryBody = generateQuery(processedImage);
+
+        return elasticService.search(queryBody).map(
                 elasticResponse -> {
                     logger.debug("stored visualsearch.image " + processedImage.imageUrl);
-                    if (elasticResponse.getHttpStatus() != HttpStatus.CREATED) {
-                        return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to write visualsearch.image processing result to elastic")),
+                    if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
+                        return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to search image in elastic")),
                                 ErrorMessage.class,
                                 elasticResponse.getHttpStatus());
                     }
-                    // get the id from request
+                    // get the results from search response
                     try {
-                        HashMap<String, Object> result =
-                                new ObjectMapper().readValue(elasticResponse.getBody(), HashMap.class);
-                        String id = (String) result.get("_id");
-                        IndexImageResponse response = new IndexImageResponse();
-                        response._id = id;
-                        return new ResponsePublisher<>(Mono.just(response),
-                                IndexImageResponse.class,
+                        return new ResponsePublisher<>(Mono.just(elasticResponse.getBody()),
+                                String.class,
                                 elasticResponse.getHttpStatus());
                     } catch (IOException e) {
                         return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to parse response from elastic")),
@@ -119,6 +104,28 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
                     }
                 }
         );
+    }
+
+    public static String generateQuery(ProcessedImage processedImage) {
+        double scale = processedImage.receivedBytes / 4.0;
+        assert scale > 0.0;
+        String jsonString = new JSONObject()
+                .put("query", new JSONObject()
+                        .put("function_score", new JSONObject()
+                                .put("functions", new JSONObject[]{
+                                        new JSONObject()
+                                                .put("gauss", new JSONObject().put("receivedBytes", new JSONObject()
+                                                .put("origin", processedImage.receivedBytes)
+                                                .put("scale", scale))
+                                        )
+                                })
+                        )
+
+                )
+                .toString();
+
+
+        return jsonString;
     }
 
 }

@@ -17,7 +17,6 @@
 package visualsearch.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import visualsearch.image.ProcessedImage;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -29,6 +28,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
+import visualsearch.image.ProcessedImage;
+import visualsearch.service.search.SearchImageHandler;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
@@ -42,12 +43,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static visualsearch.service.HelperMethods.createElasticPutResponse;
-import static visualsearch.service.HelperMethods.getImageClientResponse;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.doReturn;
+import static visualsearch.service.HelperMethods.createElasticPutResponse;
+import static visualsearch.service.HelperMethods.createElasticSearchResponse;
+import static visualsearch.service.HelperMethods.getImageClientResponse;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -169,5 +172,42 @@ public class ApiIntegTest {
         assertThat(fail.get(), nullValue());
     }
 
+    @Test
+    public void testSearch() throws IOException {
+        String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(imageUrl);
+        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(3).build());
+        doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
+                .when(elasticService).search(query);
+        doReturn(getImageClientResponse(Duration.ZERO))
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
+        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(Mono.just("{\"imageUrl\": \"" + imageUrl + "\"}"), String.class).exchange()
+                .expectStatus().isEqualTo(HttpStatus.OK)
+                .expectBody(String.class).returnResult().getResponseBody();
+        assertThat(bodyString, equalTo("{ this is really irrelevant because we only pass on the elasticsearch response here }"));
+    }
+
+    @Test
+    public void testImageResponseWithSearchRelayed() {
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
+        doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
+        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
+                .expectBody(String.class).isEqualTo("{\"message\":\"fetching image returned error\"}");
+    }
+
+    @Test
+    public void testSearchImageWithFaultyUrl() {
+        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(Mono.just("{\"image_url1\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
+                .expectBody().jsonPath("message").isEqualTo("imageUrl was not specified in request");
+    }
 
 }

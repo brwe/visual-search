@@ -18,6 +18,7 @@ package visualsearch.service.services;
 
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.entity.BasicHttpEntity;
@@ -93,6 +94,43 @@ public class ElasticService implements Closeable {
         });
     }
 
+    public Mono<ElasticResponse> search(String queryBody) {
+        return Mono.<ElasticResponse>create(sink -> {
+            FutureCallback<HttpResponse> callback = new FutureCallback<HttpResponse>() {
+
+                @Override
+                public void completed(HttpResponse result) {
+
+                    try {
+                        sink.success(new ElasticResponse(EntityUtils.toString(result.getEntity()), result.getStatusLine().getStatusCode()));
+                    } catch (IOException e) {
+                        sink.error(e);
+                    }
+                }
+
+                @Override
+                public void failed(Exception ex) {
+                    sink.error(ex);
+                }
+
+                @Override
+                public void cancelled() {
+                    sink.error(new Exception("request was cancelled"));
+                }
+
+
+            };
+            logger.debug("sending  query " + queryBody + " to elastic");
+            HttpPost request = new HttpPost(httpHost.toURI() + "/" + INDEX + "/" + TYPE + "/_search");
+            BasicHttpEntity entity = new BasicHttpEntity();
+            entity.setContent(new ByteArrayInputStream(queryBody.getBytes()));
+            request.setEntity(entity);
+            request.addHeader("accept", APPLICATION_JSON);
+            client.execute(request, callback);
+
+        });
+    }
+
     @Override
     @PreDestroy
     public void close() throws IOException {
@@ -102,6 +140,7 @@ public class ElasticService implements Closeable {
             e.printStackTrace();
         }
     }
+
 
     public static class ElasticResponse {
         HttpStatus status;

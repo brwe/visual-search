@@ -37,7 +37,9 @@ public class ImageRetrieveService implements AutoCloseable {
 
     // cannot use this client probably because of https://github.com/reactor/reactor-netty/issues/119
     // check in again in a few weeks?
+    // or maybe it is because I did not release the buffer. Look at Jackson2Tokenizer to see how this goes
     // private WebClient client = WebClient.create();
+
     private final CloseableHttpAsyncClient client = HttpAsyncClients.createDefault();
 
     public ImageRetrieveService() {

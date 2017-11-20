@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 
 public class HelperMethods {
+
     public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration, HttpStatus httpStatus) {
 
         ByteBuffer byteBuffer = ByteBuffer.wrap("abc".getBytes());
@@ -39,6 +40,13 @@ public class HelperMethods {
 
     public static Mono<ElasticService.ElasticResponse> createElasticPutResponse(Duration duration, HttpStatus httpStatus, String id) throws IOException {
         String body = "{\"_index\":\"images\",\"_type\":\"processed_images\",\"_id\":\"" + id + "\",\"_version\":1,\"result\":\"created\"}";
+        ElasticService.ElasticResponse elasticResponse = new ElasticService.ElasticResponse(body, httpStatus.value());
+
+        return Mono.just(elasticResponse).delayElement(duration);
+    }
+
+    public static Mono<ElasticService.ElasticResponse> createElasticSearchResponse(Duration duration, HttpStatus httpStatus) throws IOException {
+        String body = "{ this is really irrelevant because we only pass on the elasticsearch response here }";
         ElasticService.ElasticResponse elasticResponse = new ElasticService.ElasticResponse(body, httpStatus.value());
 
         return Mono.just(elasticResponse).delayElement(duration);
