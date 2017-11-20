@@ -17,28 +17,25 @@
 package visualsearch.service.index;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import visualsearch.image.ProcessedImage;
 import org.junit.Test;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
+import visualsearch.image.ProcessedImage;
 import visualsearch.service.ResponsePublisher;
-import visualsearch.service.index.IndexImageHandler;
-import visualsearch.service.index.IndexImageRequest;
-import visualsearch.service.index.IndexImageResponse;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.time.Duration;
 
-import static visualsearch.service.HelperMethods.createElasticPutResponse;
-import static visualsearch.service.HelperMethods.getImageClientResponse;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static visualsearch.service.HelperMethods.createElasticPutResponse;
+import static visualsearch.service.HelperMethods.getImageClientResponse;
 
 public class IndexImageHandlerTest {
 
@@ -47,7 +44,7 @@ public class IndexImageHandlerTest {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         String elasticId = "123";
         String storedBody = new ObjectMapper()
-                .writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(fetchImageRequest.imageUrl).build());
+                .writeValueAsString(ProcessedImage.builder().capacity(11389).numPixels(40000).imageUrl(fetchImageRequest.imageUrl).build());
         ElasticService elasticService = mock(ElasticService.class);
         doReturn(createElasticPutResponse(Duration.ZERO, HttpStatus.CREATED, elasticId))
                 .when(elasticService).post(storedBody);
@@ -69,17 +66,10 @@ public class IndexImageHandlerTest {
     @Test
     public void testImageRetrieveException() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        String elasticId = "123";
-        String storedBody = new ObjectMapper()
-                .writeValueAsString(ProcessedImage.builder().capacity(20).imageUrl(fetchImageRequest.imageUrl).build());
-        ElasticService elasticService = mock(ElasticService.class);
-        doReturn(createElasticPutResponse(Duration.ZERO, HttpStatus.CREATED, elasticId))
-                .when(elasticService).post(storedBody);
-
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
         doThrow(new IllegalArgumentException("No can do.")).
                 when(imageRetrieveService).fetchImage(fetchImageRequest);
-        IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, elasticService);
+        IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, null);
 
         IndexImageRequest indexImageRequest = new IndexImageRequest();
         indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";

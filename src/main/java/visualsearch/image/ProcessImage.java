@@ -17,11 +17,27 @@
 package visualsearch.image;
 
 
+import com.sun.imageio.plugins.jpeg.JPEGImageReader;
+import com.sun.imageio.plugins.jpeg.JPEGImageReaderSpi;
+import org.apache.commons.codec.binary.Base64;
+
+import javax.imageio.stream.MemoryCacheImageInputStream;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class ProcessImage {
-    public static ProcessedImage getProcessingResult(ByteBuffer b, ProcessedImage.Builder builder) {
-        return builder.capacity(b.capacity()).build();
+    public static ProcessedImage getProcessingResult(ByteBuffer b, ProcessedImage.Builder builder) throws IOException {
+        assert Base64.isBase64(b.array()) == false;
+        JPEGImageReaderSpi spi = new JPEGImageReaderSpi();
+        JPEGImageReader imageReader = new JPEGImageReader(spi);
+        MemoryCacheImageInputStream memoryCacheImageInputStream = new MemoryCacheImageInputStream(new ByteArrayInputStream(b.array()));
+        imageReader.setInput(memoryCacheImageInputStream);
+        BufferedImage img = imageReader.read(0);
+        builder.capacity(b.capacity()).build();
+        builder.numPixels(img.getWidth() * img.getHeight());
+        return builder.build();
     }
 
 }

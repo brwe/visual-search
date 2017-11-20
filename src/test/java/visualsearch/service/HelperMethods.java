@@ -16,25 +16,31 @@
 
 package visualsearch.service;
 
+import org.apache.commons.io.IOUtils;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 
 public class HelperMethods {
 
-    public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration, HttpStatus httpStatus) {
-
-        ByteBuffer byteBuffer = ByteBuffer.wrap("abc".getBytes());
+    public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration, HttpStatus httpStatus) throws IOException {
+        ByteBuffer byteBuffer;
+        try (FileInputStream fileInputStream = new FileInputStream(new File("src/test/resources/nginx/data/test.jpg"))) {
+            byte[] imageBytes = IOUtils.toByteArray(fileInputStream);
+            byteBuffer = ByteBuffer.wrap(imageBytes);
+        }
         ImageRetrieveService.ImageResponse imageResponse = new ImageRetrieveService.ImageResponse(byteBuffer, httpStatus);
         return Mono.just(imageResponse).delayElement(duration);
     }
 
-    public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration) {
+    public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration) throws IOException {
         return getImageClientResponse(duration, HttpStatus.OK);
     }
 

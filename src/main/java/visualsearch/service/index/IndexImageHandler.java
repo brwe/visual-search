@@ -19,17 +19,14 @@ package visualsearch.service.index;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.BodyExtractor;
-import org.springframework.web.reactive.function.BodyExtractors;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
-import visualsearch.service.services.ElasticService;
 import visualsearch.service.Handler;
-import visualsearch.service.services.ImageRetrieveService;
 import visualsearch.service.ResponsePublisher;
+import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -53,7 +50,6 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
                     } else {
                         resultBuilder.imageUrl(indexImageRequest.imageUrl);
                         try {
-                            logger.debug("Processing image " + indexImageRequest.imageUrl);
                             return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(indexImageRequest.imageUrl))
                                     .flatMap(clientResponse -> {
                                         if (clientResponse.statusCode() != HttpStatus.OK) {
@@ -61,7 +57,6 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
                                                     ErrorMessage.class,
                                                     clientResponse.statusCode()));
                                         } else {
-                                            logger.debug("got response for image " + indexImageRequest.imageUrl);
                                             return processAndStoreImage(clientResponse.body(), resultBuilder);
 
                                         }
@@ -78,10 +73,14 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
 
 
     private Mono<ResponsePublisher> processAndStoreImage(ByteBuffer byteBuffer, ProcessedImage.Builder builder) {
-        logger.debug("processing bytes for image " + builder.build().imageUrl);
-        ProcessedImage processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
-        logger.debug("processed bytes for image " + builder.build().imageUrl);
-        return storeResultInElasticsearch(processedImage);
+        try {
+            ProcessedImage processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
+            return storeResultInElasticsearch(processedImage);
+        } catch (IOException e) {
+            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to handle image: " + e.toString())),
+                    ErrorMessage.class,
+                    HttpStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 
     private Mono<ResponsePublisher> storeResultInElasticsearch(ProcessedImage processedImage) {
@@ -96,7 +95,6 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
         }
         return elasticService.post(documentBody).map(
                 elasticResponse -> {
-                    logger.debug("stored visualsearch.image " + processedImage.imageUrl);
                     if (elasticResponse.getHttpStatus() != HttpStatus.CREATED) {
                         return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to write visualsearch.image processing result to elastic")),
                                 ErrorMessage.class,

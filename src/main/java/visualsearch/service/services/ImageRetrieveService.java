@@ -17,7 +17,7 @@
 package visualsearch.service.services;
 
 import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
@@ -73,7 +73,7 @@ public class ImageRetrieveService implements AutoCloseable {
                 }
 
             };
-            HttpPost getRequest = new HttpPost(request.imageUrl);
+            HttpGet getRequest = new HttpGet(request.imageUrl);
             getRequest.addHeader("accept", IMAGE_JPEG_VALUE);
             client.execute(getRequest, callback);
 

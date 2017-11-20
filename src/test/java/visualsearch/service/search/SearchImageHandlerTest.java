@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.time.Duration;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
@@ -59,7 +58,7 @@ public class SearchImageHandlerTest {
     public void testJsonResponseContainsId() throws IOException {
         String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(imageUrl);
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(3).build());
+        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(11389).numPixels(40000).build());
         ElasticService elasticService = mock(ElasticService.class);
         doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
                 .when(elasticService).search(query);

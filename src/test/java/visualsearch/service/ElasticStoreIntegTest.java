@@ -139,7 +139,7 @@ public class ElasticStoreIntegTest {
                 HashMap<String, Object> hit = (HashMap<String, Object>) hits.get(0);
                 HashMap<String, Object> source = (HashMap<String, Object>) hit.get("_source");
                 assertThat(source.get("imageUrl"), equalTo("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg"));
-                assertThat(source.get("receivedBytes"), equalTo(3));
+                assertThat(source.get("receivedBytes"), equalTo(11389));
             }
 
         }
@@ -161,7 +161,7 @@ public class ElasticStoreIntegTest {
                 HttpPost indexRequest = new HttpPost(httpHost.toURI() + "/" + ElasticService.INDEX + "/" + ElasticService.TYPE);
                 indexRequest.addHeader("accept", APPLICATION_JSON);
                 BasicHttpEntity entity = new BasicHttpEntity();
-                int receivedBytes = 1 + i * 3;
+                int receivedBytes = 1 + i * 11389;
                 entity.setContent(new ByteArrayInputStream(("{\"imageUrl\" : \"" + imageUrl + "\", \"receivedBytes\": " + receivedBytes + "}").getBytes()));
                 indexRequest.setEntity(entity);
                 try (CloseableHttpResponse response = client.execute(indexRequest)) {
@@ -189,18 +189,18 @@ public class ElasticStoreIntegTest {
         ArrayList<Object> hits = (ArrayList<Object>) ((HashMap<String, Object>) result.get("hits")).get("hits");
         HashMap<String, Object> hit = (HashMap<String, Object>) hits.get(0);
         HashMap<String, Object> source = (HashMap<String, Object>) hit.get("_source");
-        assertThat(source.get("receivedBytes"), equalTo(4));
+        assertThat(source.get("receivedBytes"), equalTo(11389 + 1));
         hit = (HashMap<String, Object>) hits.get(1);
         source = (HashMap<String, Object>) hit.get("_source");
         assertThat(source.get("receivedBytes"), equalTo(1));
         hit = (HashMap<String, Object>) hits.get(2);
         source = (HashMap<String, Object>) hit.get("_source");
-        assertThat(source.get("receivedBytes"), equalTo(7));
+        assertThat(source.get("receivedBytes"), equalTo(11389 * 2 + 1));
         hit = (HashMap<String, Object>) hits.get(3);
         source = (HashMap<String, Object>) hit.get("_source");
-        assertThat(source.get("receivedBytes"), equalTo(10));
+        assertThat(source.get("receivedBytes"), equalTo(11389 * 3 + 1));
         hit = (HashMap<String, Object>) hits.get(4);
         source = (HashMap<String, Object>) hit.get("_source");
-        assertThat(source.get("receivedBytes"), equalTo(13));
+        assertThat(source.get("receivedBytes"), equalTo(11389 * 4 + 1));
     }
 }

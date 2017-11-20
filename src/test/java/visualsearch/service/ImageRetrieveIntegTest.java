@@ -24,13 +24,14 @@ import org.apache.http.impl.client.HttpClients;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import visualsearch.image.ProcessImage;
+import visualsearch.image.ProcessedImage;
 import visualsearch.service.services.ElasticService;
+import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 
@@ -63,4 +64,12 @@ public class ImageRetrieveIntegTest {
         }
     }
 
+    @Test
+    public void testTestImageIsProcessedCorrectly() throws IOException {
+        try (ImageRetrieveService imageRetrieveService = new ImageRetrieveService()) {
+            ImageRetrieveService.ImageResponse imageResponse = imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest("http://localhost/test.jpg")).block();
+            ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponse.body(), ProcessedImage.builder().imageUrl("http://localhost/test.jpg"));
+            assertThat(processedImage.receivedBytes, equalTo(11389));
+        }
+    }
 }

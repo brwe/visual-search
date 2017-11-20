@@ -49,7 +49,6 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
                     } else {
                         resultBuilder.imageUrl(searchImageRequest.imageUrl);
                         try {
-                            logger.debug("Processing image " + searchImageRequest.imageUrl);
                             return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(searchImageRequest.imageUrl))
                                     .flatMap(clientResponse -> {
                                         if (clientResponse.statusCode() != HttpStatus.OK) {
@@ -57,7 +56,6 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
                                                     ErrorMessage.class,
                                                     clientResponse.statusCode()));
                                         } else {
-                                            logger.debug("got response for image " + searchImageRequest.imageUrl);
                                             return processAndSearchImage(clientResponse.body(), resultBuilder);
 
                                         }
@@ -74,9 +72,14 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
 
 
     private Mono<ResponsePublisher> processAndSearchImage(ByteBuffer byteBuffer, ProcessedImage.Builder builder) {
-        logger.debug("processing bytes for image " + builder.build().imageUrl);
-        ProcessedImage processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
-        logger.debug("processed bytes for image " + builder.build().imageUrl);
+        ProcessedImage processedImage = null;
+        try {
+            processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
+        } catch (IOException e) {
+            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to handle image: " + e.toString())),
+                    ErrorMessage.class,
+                    HttpStatus.INTERNAL_SERVER_ERROR));
+        }
         return searchSimilarImagesInElasticsearch(processedImage);
     }
 
@@ -86,7 +89,6 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
 
         return elasticService.search(queryBody).map(
                 elasticResponse -> {
-                    logger.debug("stored visualsearch.image " + processedImage.imageUrl);
                     if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
                         return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to search image in elastic")),
                                 ErrorMessage.class,

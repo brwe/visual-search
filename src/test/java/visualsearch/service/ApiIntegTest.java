@@ -84,7 +84,7 @@ public class ApiIntegTest {
     @Test
     public void testImage() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(fetchImageRequest.imageUrl).build());
+        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(11389).numPixels(40000).imageUrl(fetchImageRequest.imageUrl).build());
         doReturn(createElasticPutResponse(HttpStatus.CREATED))
                 .when(elasticService).post(storedBody);
         doReturn(getImageClientResponse(Duration.ZERO))
@@ -100,7 +100,7 @@ public class ApiIntegTest {
     }
 
     @Test
-    public void testImageResponseRelayed() {
+    public void testImageResponseRelayed() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
@@ -123,7 +123,7 @@ public class ApiIntegTest {
     @Test
     public void testImageParallel() throws InterruptedException, IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(3).imageUrl(fetchImageRequest.imageUrl).build());
+        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(11389).numPixels(40000).imageUrl(fetchImageRequest.imageUrl).build());
         doReturn(createElasticPutResponse(HttpStatus.CREATED))
                 .when(elasticService).post(storedBody);
         doReturn(getImageClientResponse(Duration.ofMillis(1000)))
@@ -176,7 +176,7 @@ public class ApiIntegTest {
     public void testSearch() throws IOException {
         String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(imageUrl);
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(3).build());
+        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(11389).build());
         doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
                 .when(elasticService).search(query);
         doReturn(getImageClientResponse(Duration.ZERO))
@@ -190,7 +190,7 @@ public class ApiIntegTest {
     }
 
     @Test
-    public void testImageResponseWithSearchRelayed() {
+    public void testImageResponseWithSearchRelayed() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
         doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);

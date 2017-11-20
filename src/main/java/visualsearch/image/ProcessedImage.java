@@ -19,20 +19,23 @@ package visualsearch.image;
 public class ProcessedImage {
     public final int receivedBytes;
     public final String imageUrl;
+    public int numPixels = 0;
 
 
-    protected ProcessedImage(int receivedBytes, String imageUrl) {
+    protected ProcessedImage(int receivedBytes, String imageUrl, int numPixels) {
         this.receivedBytes = receivedBytes;
         this.imageUrl = imageUrl;
+        this.numPixels = numPixels;
     }
 
     public static class Builder {
         int capacity = 0;
         String imageUrl;
+        int numPixels;
 
         public ProcessedImage build() {
             assert (imageUrl != null);
-            return new ProcessedImage(capacity, imageUrl);
+            return new ProcessedImage(capacity, imageUrl, numPixels);
         }
 
         public Builder capacity(int capacity) {
@@ -42,6 +45,11 @@ public class ProcessedImage {
 
         public Builder imageUrl(String imageUrl) {
             this.imageUrl = imageUrl;
+            return this;
+        }
+
+        public Builder numPixels(int numPixels) {
+            this.numPixels = numPixels;
             return this;
         }
     }
