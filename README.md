@@ -48,6 +48,13 @@ and return its elasticsearch id:
 
 The local setup runs in docker containers.
 
+To build the containers run:
+
+```
+docker-compose build
+
+```
+
 To start the image service only, run
 
 ```
