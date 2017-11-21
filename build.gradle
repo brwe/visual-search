@@ -26,12 +26,20 @@ buildscript {
     }
 }
 
+
+
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
 
+// https://stackoverflow.com/questions/3963708/gradle-how-to-display-test-results-in-the-console-in-real-time/20359498
+test {
+    afterTest { desc, result ->
+        logger.quiet "Executing test ${desc.name} [${desc.className}] with result: ${result.resultType}"
+    }
+}
 
 repositories {
     maven { url "https://repo.spring.io/snapshot" }
