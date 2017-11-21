@@ -95,6 +95,6 @@ public class SearchImageHandlerTest {
         assertThat(imageIndexServerResponse.responseClass, equalTo(SearchImageHandler.ErrorMessage.class));
         assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(SearchImageHandler.ErrorMessage.class));
         SearchImageHandler.ErrorMessage response = (SearchImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("fetching image failed: No can do."));
+        assertThat(response.message, equalTo("java.lang.IllegalArgumentException: No can do."));
     }
 }

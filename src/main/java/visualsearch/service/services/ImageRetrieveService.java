@@ -56,7 +56,7 @@ public class ImageRetrieveService implements AutoCloseable {
                 public void completed(HttpResponse result) {
 
                     try {
-                        sink.success(new ImageResponse(ByteBuffer.wrap(EntityUtils.toByteArray(result.getEntity())), HttpStatus.resolve(result.getStatusLine().getStatusCode())));
+                        sink.success(new ImageResponse(ByteBuffer.wrap(EntityUtils.toByteArray(result.getEntity())), HttpStatus.resolve(result.getStatusLine().getStatusCode()), request.imageUrl));
                     } catch (IOException e) {
                         sink.error(e);
                     }
@@ -84,11 +84,13 @@ public class ImageRetrieveService implements AutoCloseable {
 
         private final ByteBuffer body;
         private final HttpStatus statusCode;
+        private final String imageUrl;
 
-        public ImageResponse(ByteBuffer body, HttpStatus statusCode) {
+        public ImageResponse(ByteBuffer body, HttpStatus statusCode, String imageUrl) {
 
             this.body = body;
             this.statusCode = statusCode;
+            this.imageUrl = imageUrl;
         }
 
         public ByteBuffer body() {
@@ -97,6 +99,9 @@ public class ImageRetrieveService implements AutoCloseable {
 
         public HttpStatus statusCode() {
             return statusCode;
+        }
+        public String imageUrl() {
+            return imageUrl;
         }
     }
 

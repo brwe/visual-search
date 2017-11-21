@@ -38,7 +38,7 @@ public class HelperMethods {
             byte[] imageBytes = IOUtils.toByteArray(fileInputStream);
             byteBuffer = ByteBuffer.wrap(imageBytes);
         }
-        ImageRetrieveService.ImageResponse imageResponse = new ImageRetrieveService.ImageResponse(byteBuffer, httpStatus);
+        ImageRetrieveService.ImageResponse imageResponse = new ImageRetrieveService.ImageResponse(byteBuffer, httpStatus, DUMMY_IMAGE_URL);
         return Mono.just(imageResponse).delayElement(duration);
     }
 

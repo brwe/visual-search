@@ -38,54 +38,77 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
     }
 
     @Override
-    protected Mono<ResponsePublisher> computeResponse(Mono<SearchImageRequest> searchImageRequestMono) {
-        ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
+    protected Mono<ResponsePublisher> computeResponse(Mono<SearchImageRequest> searchImageRequest) {
+        Mono<ImageRetrieveService.ImageResponse> imageResponse = fetchImage(searchImageRequest);
+        Mono<ProcessedImage> processedImage = processImage(imageResponse);
+        Mono<String> elasticsearchResult = searchSimilarImages(processedImage);
+        return createResult(elasticsearchResult);
+    }
+
+    private Mono<ImageRetrieveService.ImageResponse> fetchImage(Mono<SearchImageRequest> searchImageRequestMono) {
         return searchImageRequestMono.flatMap(searchImageRequest -> {
             if (searchImageRequest.imageUrl == null) {
-                return monoErrorMessage("imageUrl was not specified in request", HttpStatus.BAD_REQUEST);
+                throw new RequestFailedException(HttpStatus.BAD_REQUEST, "imageUrl was not specified in request.");
             } else {
-                resultBuilder.imageUrl(searchImageRequest.imageUrl);
-                try {
-                    Mono<ImageRetrieveService.ImageResponse> imageResponseMono = imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(searchImageRequest.imageUrl));
-                    return imageResponseMono.flatMap(clientResponse -> {
-                        if (clientResponse.statusCode() != HttpStatus.OK) {
-                            return monoErrorMessage("fetching image returned error", clientResponse.statusCode());
-                        } else {
-                            ProcessedImage processedImage = null;
-                            try {
-                                processedImage = ProcessImage.getProcessingResult(clientResponse.body(), resultBuilder);
-                            } catch (IOException e) {
-                                return monoErrorMessage("Unable to handle image: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
-                            }
-                            return searchSimilarImagesInElasticsearch(processedImage);
-                        }
-                    });
-                } catch (Exception e) {
-                    return monoErrorMessage("fetching image failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-                }
+                return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(searchImageRequest.imageUrl));
             }
         });
     }
 
-
-    private Mono<ResponsePublisher> searchSimilarImagesInElasticsearch(ProcessedImage processedImage) {
-        String queryBody;
-        queryBody = generateQuery(processedImage);
-
-        Mono<ElasticService.ElasticResponse> elasticResponseMono = elasticService.search(queryBody);
-        return elasticResponseMono.map(elasticResponse -> {
-            if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
-                return errorMessage("Unable to search image in elastic", elasticResponse.getHttpStatus());
-            }
-            // get the results from search response
-            try {
-                return new ResponsePublisher<>(Mono.just(elasticResponse.getBody()),
-                        String.class,
-                        elasticResponse.getHttpStatus());
-            } catch (IOException e) {
-                return errorMessage("Unable to parse response from elastic: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+    private Mono<ProcessedImage> processImage(Mono<ImageRetrieveService.ImageResponse> imageResponseMono) {
+        return imageResponseMono.map(imageResponse -> {
+            if (imageResponse.statusCode() != HttpStatus.OK) {
+                throw new RequestFailedException(imageResponse.statusCode(), "Could not fetch image.");
+            } else {
+                ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
+                resultBuilder.imageUrl(imageResponse.imageUrl());
+                return processImage(imageResponse, resultBuilder);
             }
         });
+    }
+
+    private Mono<String> searchSimilarImages(Mono<ProcessedImage> processedImageMono) {
+        return processedImageMono.flatMap(processedImage -> {
+            String queryBody = generateQuery(processedImage);
+            Mono<ElasticService.ElasticResponse> elasticResponseMono = elasticService.search(queryBody);
+            return elasticResponseMono.map(elasticResponse -> {
+                if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
+                    throw new RequestFailedException(elasticResponse.getHttpStatus(), "Could not query elasticsearch: ");
+                }
+                String elasticsearchResult = getElasticsearchResponse(elasticResponse);
+                return elasticsearchResult;
+            });
+        });
+    }
+
+    private Mono<ResponsePublisher> createResult(Mono<String> elasticsearchResult) {
+        return elasticsearchResult.map(result -> new ResponsePublisher(Mono.just(result), String.class, HttpStatus.OK))
+                .onErrorResume(t -> {
+                    if (t instanceof RequestFailedException) {
+                        RequestFailedException requestFailedException = (RequestFailedException) t;
+                        return monoErrorMessage(requestFailedException.getMessage(), requestFailedException.httpStatus);
+                    } else {
+                        return monoErrorMessage(t.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+                    }
+                });
+    }
+
+
+    ProcessedImage processImage(ImageRetrieveService.ImageResponse imageResponse, ProcessedImage.Builder resultBuilder) {
+        try {
+            return ProcessImage.getProcessingResult(imageResponse.body(), resultBuilder);
+        } catch (IOException e) {
+            throw new RequestFailedException(HttpStatus.INTERNAL_SERVER_ERROR, e, "Could not process image: ");
+        }
+    }
+
+
+    private String getElasticsearchResponse(ElasticService.ElasticResponse elasticResponse) {
+        try {
+            return elasticResponse.getBody();
+        } catch (IOException e) {
+            throw new RequestFailedException(HttpStatus.INTERNAL_SERVER_ERROR, e, "Could not extract response from elasticsearch: ");
+        }
     }
 
     public static String generateQuery(ProcessedImage processedImage) {
@@ -107,6 +130,32 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
                 )
                 .toString();
         return jsonString;
+    }
+
+    public static class RequestFailedException extends RuntimeException {
+        private final HttpStatus httpStatus;
+        private final Throwable t;
+        private final String message;
+
+        public RequestFailedException(HttpStatus httpStatus, Throwable t, String message) {
+            this.t = t;
+            this.httpStatus = httpStatus;
+            this.message = message;
+        }
+
+        public RequestFailedException(HttpStatus httpStatus, String message) {
+            this.t = null;
+            this.httpStatus = httpStatus;
+            this.message = message;
+        }
+
+        public HttpStatus getHttpStatus() {
+            return httpStatus;
+        }
+
+        public String getMessage() {
+            return message + (t == null ? "" : t.toString());
+        }
     }
 
 }
