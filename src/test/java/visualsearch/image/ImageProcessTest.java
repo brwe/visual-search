@@ -1,9 +1,7 @@
-package visualsearch.service;
+package visualsearch.image;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
-import visualsearch.image.ProcessImage;
-import visualsearch.image.ProcessedImage;
 
 import java.io.File;
 import java.io.FileInputStream;
