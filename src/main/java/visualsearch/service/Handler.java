@@ -18,6 +18,7 @@ package visualsearch.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.web.reactive.function.BodyExtractor;
 import org.springframework.web.reactive.function.BodyExtractors;
@@ -41,6 +42,16 @@ public abstract class Handler<Request, Response> {
         requestExtractor = BodyExtractors.toMono(requestClass);
         this.imageRetrieveService = imageRetrieveService;
         this.elasticService = elasticService;
+    }
+
+    protected static ResponsePublisher errorMessage(String message, HttpStatus httpStatus) {
+        return new ResponsePublisher<>(Mono.just(new ErrorMessage(message)),
+                ErrorMessage.class,
+                httpStatus);
+    }
+
+    protected static Mono<ResponsePublisher> monoErrorMessage(String message, HttpStatus httpStatus) {
+        return Mono.just(errorMessage(message, httpStatus));
     }
 
     public Mono<ServerResponse> handle(ServerRequest request) {

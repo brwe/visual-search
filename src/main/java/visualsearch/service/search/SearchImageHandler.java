@@ -28,7 +28,6 @@ import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 @Component
 public class SearchImageHandler extends Handler<SearchImageRequest, String> {
@@ -42,70 +41,51 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
     protected Mono<ResponsePublisher> computeResponse(Mono<SearchImageRequest> searchImageRequestMono) {
         ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
         return searchImageRequestMono.flatMap(searchImageRequest -> {
-                    if (searchImageRequest.imageUrl == null) {
-                        return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("imageUrl was not specified in request")),
-                                ErrorMessage.class,
-                                HttpStatus.BAD_REQUEST));
-                    } else {
-                        resultBuilder.imageUrl(searchImageRequest.imageUrl);
-                        try {
-                            return imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(searchImageRequest.imageUrl))
-                                    .flatMap(clientResponse -> {
-                                        if (clientResponse.statusCode() != HttpStatus.OK) {
-                                            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching image returned error")),
-                                                    ErrorMessage.class,
-                                                    clientResponse.statusCode()));
-                                        } else {
-                                            return processAndSearchImage(clientResponse.body(), resultBuilder);
-
-                                        }
-                                    });
-                        } catch (Exception e) {
-                            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("fetching image failed: " + e.getMessage())),
-                                    ErrorMessage.class,
-                                    HttpStatus.INTERNAL_SERVER_ERROR));
+            if (searchImageRequest.imageUrl == null) {
+                return monoErrorMessage("imageUrl was not specified in request", HttpStatus.BAD_REQUEST);
+            } else {
+                resultBuilder.imageUrl(searchImageRequest.imageUrl);
+                try {
+                    Mono<ImageRetrieveService.ImageResponse> imageResponseMono = imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(searchImageRequest.imageUrl));
+                    return imageResponseMono.flatMap(clientResponse -> {
+                        if (clientResponse.statusCode() != HttpStatus.OK) {
+                            return monoErrorMessage("fetching image returned error", clientResponse.statusCode());
+                        } else {
+                            ProcessedImage processedImage = null;
+                            try {
+                                processedImage = ProcessImage.getProcessingResult(clientResponse.body(), resultBuilder);
+                            } catch (IOException e) {
+                                return monoErrorMessage("Unable to handle image: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+                            }
+                            return searchSimilarImagesInElasticsearch(processedImage);
                         }
-                    }
+                    });
+                } catch (Exception e) {
+                    return monoErrorMessage("fetching image failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
                 }
-        );
+            }
+        });
     }
 
-
-    private Mono<ResponsePublisher> processAndSearchImage(ByteBuffer byteBuffer, ProcessedImage.Builder builder) {
-        ProcessedImage processedImage = null;
-        try {
-            processedImage = ProcessImage.getProcessingResult(byteBuffer, builder);
-        } catch (IOException e) {
-            return Mono.just(new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to handle image: " + e.toString())),
-                    ErrorMessage.class,
-                    HttpStatus.INTERNAL_SERVER_ERROR));
-        }
-        return searchSimilarImagesInElasticsearch(processedImage);
-    }
 
     private Mono<ResponsePublisher> searchSimilarImagesInElasticsearch(ProcessedImage processedImage) {
         String queryBody;
         queryBody = generateQuery(processedImage);
 
-        return elasticService.search(queryBody).map(
-                elasticResponse -> {
-                    if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
-                        return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to search image in elastic")),
-                                ErrorMessage.class,
-                                elasticResponse.getHttpStatus());
-                    }
-                    // get the results from search response
-                    try {
-                        return new ResponsePublisher<>(Mono.just(elasticResponse.getBody()),
-                                String.class,
-                                elasticResponse.getHttpStatus());
-                    } catch (IOException e) {
-                        return new ResponsePublisher<>(Mono.just(new ErrorMessage("Unable to parse response from elastic")),
-                                ErrorMessage.class,
-                                HttpStatus.INTERNAL_SERVER_ERROR);
-                    }
-                }
-        );
+        Mono<ElasticService.ElasticResponse> elasticResponseMono = elasticService.search(queryBody);
+        return elasticResponseMono.map(elasticResponse -> {
+            if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
+                return errorMessage("Unable to search image in elastic", elasticResponse.getHttpStatus());
+            }
+            // get the results from search response
+            try {
+                return new ResponsePublisher<>(Mono.just(elasticResponse.getBody()),
+                        String.class,
+                        elasticResponse.getHttpStatus());
+            } catch (IOException e) {
+                return errorMessage("Unable to parse response from elastic: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        });
     }
 
     public static String generateQuery(ProcessedImage processedImage) {
@@ -116,17 +96,16 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
                         .put("function_score", new JSONObject()
                                 .put("functions", new JSONObject[]{
                                         new JSONObject()
-                                                .put("gauss", new JSONObject().put("receivedBytes", new JSONObject()
-                                                .put("origin", processedImage.receivedBytes)
-                                                .put("scale", scale))
+                                                .put("gauss", new JSONObject()
+                                                .put("receivedBytes", new JSONObject()
+                                                        .put("origin", processedImage.receivedBytes)
+                                                        .put("scale", scale))
                                         )
                                 })
                         )
 
                 )
                 .toString();
-
-
         return jsonString;
     }
 
