@@ -28,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
+import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
 import visualsearch.service.search.SearchImageHandler;
 import visualsearch.service.services.ElasticService;
@@ -46,8 +47,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.doReturn;
+import static visualsearch.service.HelperMethods.DUMMY_IMAGE_URL;
 import static visualsearch.service.HelperMethods.createElasticPutResponse;
 import static visualsearch.service.HelperMethods.createElasticSearchResponse;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
@@ -82,52 +85,73 @@ public class ApiIntegTest {
     }
 
     @Test
-    public void testImage() throws IOException {
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(11389).numPixels(40000).imageUrl(fetchImageRequest.imageUrl).build());
+    public void testIndexImageNoFailures() throws IOException {
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        doReturn(imageResponseMono)
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
+
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
+        String storedBody = new ObjectMapper().writeValueAsString(processedImage);
         doReturn(createElasticPutResponse(HttpStatus.CREATED))
                 .when(elasticService).post(storedBody);
-        doReturn(getImageClientResponse(Duration.ZERO))
-                .when(imageRetrieveService).fetchImage(fetchImageRequest);
-        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
+
+        String bodyString = this.webClient
+                .post()
+                .uri("/image")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.CREATED)
-                .expectBody(String.class).returnResult().getResponseBody();
-        HashMap<String, Object> bodyMap =
-                new ObjectMapper().readValue(bodyString, HashMap.class);
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
+        HashMap<String, Object> bodyMap = new ObjectMapper().readValue(bodyString, HashMap.class);
         assertThat(bodyMap.get("_id"), instanceOf(String.class));
     }
 
     @Test
     public void testImageResponseRelayed() throws IOException {
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
         doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
-        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
+        this.webClient
+                .post()
+                .uri("/image")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
                 .expectBody(String.class).isEqualTo("{\"message\":\"fetching image returned error\"}");
     }
 
     @Test
-    public void testImageWithFaultyUrl() {
-        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
+    public void testIndexImageWithFaultyUrl() {
+        this.webClient
+                .post()
+                .uri("/image")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"image_url1\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .body(Mono.just("{\"image_url1\": \"https://123.jpg\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().jsonPath("message").isEqualTo("imageUrl was not specified in request");
     }
 
     @Test
-    public void testImageParallel() throws InterruptedException, IOException {
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        String storedBody = new ObjectMapper().writeValueAsString(ProcessedImage.builder().capacity(11389).numPixels(40000).imageUrl(fetchImageRequest.imageUrl).build());
-        doReturn(createElasticPutResponse(HttpStatus.CREATED))
-                .when(elasticService).post(storedBody);
-        doReturn(getImageClientResponse(Duration.ofMillis(1000)))
+    public void testIndexImageParallel() throws InterruptedException, IOException {
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ofSeconds(1));
+        doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
+
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
+        String storedBody = new ObjectMapper().writeValueAsString(processedImage);
+        doReturn(createElasticPutResponse(Duration.ofSeconds(1), HttpStatus.CREATED, "123"))
+                .when(elasticService).post(storedBody);
+
         CountDownLatch latch = new CountDownLatch(1);
         final WebTestClient threadClient = webClient;
         List<Thread> threads = new ArrayList();
@@ -142,9 +166,13 @@ public class ApiIntegTest {
                 }
                 try {
 
-                    String bodyString = threadClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
+                    String bodyString = threadClient.mutate().responseTimeout(Duration.ofSeconds(600)).build()
+                            .post()
+                            .uri("/image")
+                            .contentType(MediaType.APPLICATION_JSON)
                             .accept(MediaType.APPLICATION_JSON)
-                            .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                            .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                            .exchange()
                             .expectStatus().isEqualTo(HttpStatus.CREATED)
                             .expectBody(String.class).returnResult().getResponseBody();
                     HashMap<String, Object> bodyMap =
@@ -164,26 +192,30 @@ public class ApiIntegTest {
             t.join();
         }
         long end = System.nanoTime();
-        System.out.println("num failures: " + fails.get());
-        System.out.println(TimeUnit.NANOSECONDS.toMillis(end - start));
-        if (fail.get() != null) {
-            System.out.println(fail.get().toString());
-        }
+        long timeTaken = TimeUnit.NANOSECONDS.toMillis(end - start);
+        // this is a really dumb way to check of requests are actually processed in paralell or block. Find a better way later.
+        assertThat(timeTaken, lessThan(5000l));
         assertThat(fail.get(), nullValue());
     }
 
     @Test
-    public void testSearch() throws IOException {
-        String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(imageUrl);
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(11389).build());
-        doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
-                .when(elasticService).search(query);
-        doReturn(getImageClientResponse(Duration.ZERO))
+    public void testImageSearch() throws IOException {
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
-        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
+        String queryBody = SearchImageHandler.generateQuery(processedImage);
+        doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
+                .when(elasticService).search(queryBody);
+
+        String bodyString = this.webClient
+                .post()
+                .uri("/image_search").contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"imageUrl\": \"" + imageUrl + "\"}"), String.class).exchange()
+                .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.OK)
                 .expectBody(String.class).returnResult().getResponseBody();
         assertThat(bodyString, equalTo("{ this is really irrelevant because we only pass on the elasticsearch response here }"));
@@ -191,21 +223,31 @@ public class ApiIntegTest {
 
     @Test
     public void testImageResponseWithSearchRelayed() throws IOException {
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        doReturn(getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND))
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND);
+        doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
-        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+
+        this.webClient
+                .post()
+                .uri("/image_search")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
                 .expectBody(String.class).isEqualTo("{\"message\":\"fetching image returned error\"}");
     }
 
     @Test
     public void testSearchImageWithFaultyUrl() {
-        this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+        this.webClient
+                .post()
+                .uri("/image_search")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"image_url1\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .body(Mono.just("{\"image_url1\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
                 .expectBody().jsonPath("message").isEqualTo("imageUrl was not specified in request");
     }

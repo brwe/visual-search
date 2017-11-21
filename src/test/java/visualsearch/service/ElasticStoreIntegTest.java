@@ -41,6 +41,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
+import visualsearch.image.ProcessImage;
+import visualsearch.image.ProcessedImage;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
@@ -56,6 +58,7 @@ import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
+import static visualsearch.service.HelperMethods.DUMMY_IMAGE_URL;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
 import static visualsearch.service.services.ElasticService.ELASTIC_HOST;
 import static visualsearch.service.services.ElasticService.ELASTIC_PORT;
@@ -104,14 +107,18 @@ public class ElasticStoreIntegTest {
     }
 
     @Test
-    public void testImage() throws IOException {
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        doReturn(getImageClientResponse(Duration.ZERO))
+    public void testIndexImage() throws IOException {
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
-
-        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image").contentType(MediaType.APPLICATION_JSON)
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
+        String bodyString = this.webClient
+                .post()
+                .uri("/image")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"imageUrl\": \"https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg\"}"), String.class).exchange()
+                .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class).exchange()
                 .expectStatus().isEqualTo(HttpStatus.CREATED)
                 .expectBody(String.class).returnResult().getResponseBody();
         HashMap<String, Object> bodyMap =
@@ -125,7 +132,7 @@ public class ElasticStoreIntegTest {
             HttpPost request = new HttpPost(httpHost.toURI() + "/_refresh");
             request.addHeader("accept", APPLICATION_JSON);
             try (CloseableHttpResponse response = client.execute(request)) {
-
+                assertThat(response.getStatusLine().getStatusCode(), equalTo(HttpStatus.OK.value()));
             }
 
             HttpGet searchRequest = new HttpGet(httpHost.toURI() + "/images/_search");
@@ -138,8 +145,8 @@ public class ElasticStoreIntegTest {
                 ArrayList<Object> hits = (ArrayList<Object>) ((HashMap<String, Object>) result.get("hits")).get("hits");
                 HashMap<String, Object> hit = (HashMap<String, Object>) hits.get(0);
                 HashMap<String, Object> source = (HashMap<String, Object>) hit.get("_source");
-                assertThat(source.get("imageUrl"), equalTo("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg"));
-                assertThat(source.get("receivedBytes"), equalTo(11389));
+                assertThat(source.get("imageUrl"), equalTo(DUMMY_IMAGE_URL));
+                assertThat(source.get("receivedBytes"), equalTo(processedImage.receivedBytes));
             }
 
         }
@@ -148,10 +155,11 @@ public class ElasticStoreIntegTest {
 
     @Test
     public void testSearchImage() throws IOException {
-        String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        doReturn(getImageClientResponse(Duration.ZERO))
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
 
         // index a few images that are similar to the searched image
         HttpHost httpHost = new HttpHost(System.getProperty(ELASTIC_HOST), Integer.parseInt(System.getProperty(ELASTIC_PORT)));
@@ -162,7 +170,7 @@ public class ElasticStoreIntegTest {
                 indexRequest.addHeader("accept", APPLICATION_JSON);
                 BasicHttpEntity entity = new BasicHttpEntity();
                 int receivedBytes = 1 + i * 11389;
-                entity.setContent(new ByteArrayInputStream(("{\"imageUrl\" : \"" + imageUrl + "\", \"receivedBytes\": " + receivedBytes + "}").getBytes()));
+                entity.setContent(new ByteArrayInputStream(("{\"imageUrl\" : \"" + DUMMY_IMAGE_URL + "\", \"receivedBytes\": " + receivedBytes + "}").getBytes()));
                 indexRequest.setEntity(entity);
                 try (CloseableHttpResponse response = client.execute(indexRequest)) {
                     assertThat(response.getStatusLine().getStatusCode(), equalTo(HttpStatus.CREATED.value()));
@@ -177,9 +185,14 @@ public class ElasticStoreIntegTest {
             }
         }
 
-        String bodyString = this.webClient.mutate().responseTimeout(Duration.ofSeconds(600)).build().post().uri("/image_search").contentType(MediaType.APPLICATION_JSON)
+        // now search and see if order is correct
+        String bodyString = this.webClient
+                .post()
+                .uri("/image_search")
+                .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
-                .body(Mono.just("{\"imageUrl\": \"" + imageUrl + "\"}"), String.class).exchange()
+                .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                .exchange()
                 .expectStatus().isEqualTo(HttpStatus.OK)
                 .expectBody(String.class).returnResult().getResponseBody();
 
