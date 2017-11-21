@@ -16,10 +16,10 @@
 
 package visualsearch.service.search;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
+import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
 import visualsearch.service.ResponsePublisher;
 import visualsearch.service.services.ElasticService;
@@ -34,7 +34,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static visualsearch.service.HelperMethods.createElasticPutResponse;
+import static visualsearch.service.HelperMethods.DUMMY_IMAGE_URL;
 import static visualsearch.service.HelperMethods.createElasticSearchResponse;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
 
@@ -42,34 +42,37 @@ public class SearchImageHandlerTest {
 
     @Test
     public void testQueryFromProcessedImage() {
-        String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(20).build());
+        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(DUMMY_IMAGE_URL).capacity(20).build());
         assertThat(query, equalTo("{\"query\":{\"function_score\":{\"functions\":[{\"gauss\":{\"receivedBytes\":{\"origin\":20,\"scale\":5}}}]}}}"));
     }
 
     @Test
-    public void testCanHandleBytesLessThat4QueryFromProcessedImage() {
-        String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(3).build());
+    public void testQueryFromProcessedImageCanHandleLessThat4Bytes() {
+        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(DUMMY_IMAGE_URL).capacity(3).build());
         assertThat(query, equalTo("{\"query\":{\"function_score\":{\"functions\":[{\"gauss\":{\"receivedBytes\":{\"origin\":3,\"scale\":0.75}}}]}}}"));
     }
 
     @Test
-    public void testJsonResponseContainsId() throws IOException {
-        String imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(imageUrl);
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(imageUrl).capacity(11389).numPixels(40000).build());
+    public void testElasticsearchResponseIsReturned() throws IOException {
+
+        // mock the image retrieval
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
+        Mono<ImageRetrieveService.ImageResponse> imageResponse = getImageClientResponse(Duration.ZERO);
+        ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
+        doReturn(imageResponse)
+                .when(imageRetrieveService).fetchImage(fetchImageRequest);
+
+        // mock elasticsearch
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponse.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
+        String queryBody = SearchImageHandler.generateQuery(processedImage);
         ElasticService elasticService = mock(ElasticService.class);
         doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
-                .when(elasticService).search(query);
+                .when(elasticService).search(queryBody);
 
-        ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
-        doReturn(getImageClientResponse(Duration.ZERO))
-                .when(imageRetrieveService).fetchImage(fetchImageRequest);
+
         SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, elasticService);
-
         SearchImageRequest indexImageRequest = new SearchImageRequest();
-        indexImageRequest.imageUrl = imageUrl;
+        indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
         ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
         assertThat(imageIndexServerResponse.responseClass, equalTo(String.class));
         assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(String.class));
@@ -79,21 +82,15 @@ public class SearchImageHandlerTest {
 
     @Test
     public void testImageRetrieveException() throws IOException {
-        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest("https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg");
-        String elasticId = "123";
-        String storedBody = new ObjectMapper()
-                .writeValueAsString(ProcessedImage.builder().capacity(20).imageUrl(fetchImageRequest.imageUrl).build());
-        ElasticService elasticService = mock(ElasticService.class);
-        doReturn(createElasticPutResponse(Duration.ZERO, HttpStatus.CREATED, elasticId))
-                .when(elasticService).post(storedBody);
-
+        // mock image retrieval
+        ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
         doThrow(new IllegalArgumentException("No can do.")).
                 when(imageRetrieveService).fetchImage(fetchImageRequest);
-        SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, elasticService);
+        SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, null);
 
         SearchImageRequest indexImageRequest = new SearchImageRequest();
-        indexImageRequest.imageUrl = "https://c7.staticflickr.com/6/5499/10245691204_98dce75b5a_o.jpg";
+        indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
         ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
         assertThat(imageIndexServerResponse.responseClass, equalTo(SearchImageHandler.ErrorMessage.class));
         assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(SearchImageHandler.ErrorMessage.class));

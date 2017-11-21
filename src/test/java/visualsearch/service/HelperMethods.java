@@ -30,6 +30,8 @@ import java.time.Duration;
 
 public class HelperMethods {
 
+    public static final String DUMMY_IMAGE_URL = "http://iwishidlearnedsomethingotherthanprogramming.com";
+
     public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration, HttpStatus httpStatus) throws IOException {
         ByteBuffer byteBuffer;
         try (FileInputStream fileInputStream = new FileInputStream(new File("src/test/resources/nginx/data/test.jpg"))) {
