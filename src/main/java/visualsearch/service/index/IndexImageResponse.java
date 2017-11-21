@@ -17,6 +17,20 @@
 
 package visualsearch.service.index;
 
-public class IndexImageResponse {
+import org.springframework.http.HttpStatus;
+import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Mono;
+import visualsearch.service.AbstractResponse;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+
+public class IndexImageResponse extends AbstractResponse{
     public String _id;
+
+    public Mono<ServerResponse> getServerResponse() {
+        return ServerResponse
+                .status(HttpStatus.CREATED)
+                .contentType(APPLICATION_JSON)
+                .body(Mono.just(this), IndexImageResponse.class);
+    }
 }

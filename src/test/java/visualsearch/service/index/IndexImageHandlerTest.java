@@ -22,16 +22,16 @@ import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
-import visualsearch.service.ResponsePublisher;
+import visualsearch.service.Handler;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.time.Duration;
 
+import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -64,11 +64,8 @@ public class IndexImageHandlerTest {
         IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, elasticService);
         IndexImageRequest indexImageRequest = new IndexImageRequest();
         indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
-        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
-        assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageResponse.class));
-        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageResponse.class));
-        IndexImageResponse response = (IndexImageResponse) imageIndexServerResponse.resultMono.block();
-        assertThat(response._id, equalTo(elasticId));
+        IndexImageResponse imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
+        assertThat(imageIndexServerResponse._id, equalTo(elasticId));
     }
 
     @Test
@@ -83,11 +80,12 @@ public class IndexImageHandlerTest {
         IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, null);
         IndexImageRequest indexImageRequest = new IndexImageRequest();
         indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
-        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
-        assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageHandler.ErrorMessage.class));
-        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageHandler.ErrorMessage.class));
-        IndexImageHandler.ErrorMessage response = (IndexImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("java.lang.IllegalArgumentException: No can do."));
+        try {
+            imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
+            fail();
+        } catch (IllegalArgumentException e) {
+            assertThat(e.getMessage(), equalTo("No can do."));
+        }
     }
 
     @Test
@@ -102,11 +100,12 @@ public class IndexImageHandlerTest {
         IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, null);
         IndexImageRequest indexImageRequest = new IndexImageRequest();
         indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
-        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
-        assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageHandler.ErrorMessage.class));
-        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageHandler.ErrorMessage.class));
-        IndexImageHandler.ErrorMessage response = (IndexImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("Could not fetch image."));
+        try {
+            imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
+            fail();
+        } catch (Handler.RequestFailedException e) {
+            assertThat(e.getMessage(), equalTo("Could not fetch image."));
+        }
     }
 
 }

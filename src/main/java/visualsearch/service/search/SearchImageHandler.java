@@ -22,29 +22,26 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessedImage;
 import visualsearch.service.Handler;
-import visualsearch.service.ResponsePublisher;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 @Component
-public class SearchImageHandler extends Handler<SearchImageRequest, String> {
+public class SearchImageHandler extends Handler<SearchImageRequest, SearchImageResponse> {
 
     public SearchImageHandler(ImageRetrieveService imageRetrieveService, ElasticService elasticService) {
         super(imageRetrieveService, elasticService, SearchImageRequest.class);
     }
 
     @Override
-    protected Mono<ResponsePublisher> computeResponse(Mono<SearchImageRequest> searchImageRequestMono) {
+    protected Mono<SearchImageResponse> computeResponse(Mono<SearchImageRequest> searchImageRequestMono) {
         return searchImageRequestMono
                 .flatMap(searchImageRequest ->
                         fetchImage(searchImageRequest.imageUrl))
                 .map(imageResponse -> processImage(imageResponse))
-                .flatMap(processedImage -> searchSimilarImages(processedImage))
-                .map(result -> new ResponsePublisher(Mono.just(result), String.class, HttpStatus.OK))
-                .onErrorResume(t -> handleError(t));
+                .flatMap(processedImage -> searchSimilarImages(processedImage));
     }
 
-    private Mono<String> searchSimilarImages(ProcessedImage processedImage) {
+    private Mono<SearchImageResponse> searchSimilarImages(ProcessedImage processedImage) {
         String queryBody = generateQuery(processedImage);
         Mono<ElasticService.ElasticResponse> elasticResponseMono = elasticService.search(queryBody);
         return elasticResponseMono.map(elasticResponse -> {
@@ -52,7 +49,9 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
                 throw new RequestFailedException(elasticResponse.getHttpStatus(), "Could not query elasticsearch: ");
             }
             String elasticsearchResult = getElasticsearchResponse(elasticResponse);
-            return elasticsearchResult;
+            SearchImageResponse searchImageResponse = new SearchImageResponse();
+            searchImageResponse.response = elasticsearchResult;
+            return searchImageResponse;
         });
     }
 
@@ -71,7 +70,6 @@ public class SearchImageHandler extends Handler<SearchImageRequest, String> {
                                         )
                                 })
                         )
-
                 )
                 .toString();
         return jsonString;

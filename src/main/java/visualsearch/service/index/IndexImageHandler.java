@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessedImage;
 import visualsearch.service.Handler;
-import visualsearch.service.ResponsePublisher;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
@@ -38,14 +37,13 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
     }
 
     @Override
-    protected Mono<ResponsePublisher> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
+    protected Mono<IndexImageResponse> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
         return indexImageRequestMono
                 .flatMap(searchImageRequest ->
                         fetchImage(searchImageRequest.imageUrl))
                 .map(imageResponse -> processImage(imageResponse))
                 .flatMap(processedImage -> storeResultInElasticsearch(processedImage))
-                .map(result -> convertEsResponseToResponse(result))
-                .onErrorResume(t -> handleError(t));
+                .map(result -> convertEsResponseToResponse(result));
     }
 
 
@@ -60,14 +58,7 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
         });
     }
 
-    private ResponsePublisher convertEsResponseToResponse(ElasticService.ElasticResponse elasticResponse) {
-        IndexImageResponse response = createResponse(elasticResponse);
-        return new ResponsePublisher<>(Mono.just(response),
-                IndexImageResponse.class,
-                elasticResponse.getHttpStatus());
-    }
-
-    private IndexImageResponse createResponse(ElasticService.ElasticResponse elasticResponse) {
+    private IndexImageResponse convertEsResponseToResponse(ElasticService.ElasticResponse elasticResponse) {
         HashMap<String, Object> result;
         try {
             result = new ObjectMapper().readValue(elasticResponse.getBody(), HashMap.class);

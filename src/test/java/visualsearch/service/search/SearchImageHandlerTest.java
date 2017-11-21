@@ -21,16 +21,16 @@ import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
-import visualsearch.service.ResponsePublisher;
+import visualsearch.service.index.IndexImageResponse;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
 import java.time.Duration;
 
+import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -69,15 +69,11 @@ public class SearchImageHandlerTest {
         doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
                 .when(elasticService).search(queryBody);
 
-
         SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, elasticService);
-        SearchImageRequest indexImageRequest = new SearchImageRequest();
-        indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
-        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
-        assertThat(imageIndexServerResponse.responseClass, equalTo(String.class));
-        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(String.class));
-        String response = (String) imageIndexServerResponse.resultMono.block();
-        assertThat(response, equalTo("{ this is really irrelevant because we only pass on the elasticsearch response here }"));
+        SearchImageRequest searchImageRequest = new SearchImageRequest();
+        searchImageRequest.imageUrl = DUMMY_IMAGE_URL;
+        SearchImageResponse searchImageResponse = imageHandler.computeResponse(Mono.just(searchImageRequest)).block();
+        assertThat(searchImageResponse.response, equalTo("{ this is really irrelevant because we only pass on the elasticsearch response here }"));
     }
 
     @Test
@@ -89,12 +85,13 @@ public class SearchImageHandlerTest {
                 when(imageRetrieveService).fetchImage(fetchImageRequest);
         SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, null);
 
-        SearchImageRequest indexImageRequest = new SearchImageRequest();
-        indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
-        ResponsePublisher imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
-        assertThat(imageIndexServerResponse.responseClass, equalTo(SearchImageHandler.ErrorMessage.class));
-        assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(SearchImageHandler.ErrorMessage.class));
-        SearchImageHandler.ErrorMessage response = (SearchImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("java.lang.IllegalArgumentException: No can do."));
+        SearchImageRequest searchImageRequest = new SearchImageRequest();
+        searchImageRequest.imageUrl = DUMMY_IMAGE_URL;
+        try {
+            imageHandler.computeResponse(Mono.just(searchImageRequest)).block();
+            fail();
+        } catch (IllegalArgumentException e) {
+            assertThat(e.getMessage(), equalTo("No can do."));
+        }
     }
 }

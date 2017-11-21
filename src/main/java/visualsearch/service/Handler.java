@@ -35,7 +35,7 @@ import java.io.IOException;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
-public abstract class Handler<Request, Response> {
+public abstract class Handler<Request, Response extends AbstractResponse> {
 
     protected final Logger logger = LoggerFactory.getLogger(this.getClass());
     protected final ImageRetrieveService imageRetrieveService;
@@ -49,12 +49,18 @@ public abstract class Handler<Request, Response> {
         this.elasticService = elasticService;
     }
 
-    protected static Mono<? extends ResponsePublisher> handleError(Throwable t) {
+    protected static Mono<ServerResponse> handleError(Throwable t) {
         if (t instanceof Handler.RequestFailedException) {
             RequestFailedException requestFailedException = (RequestFailedException) t;
-            return monoErrorMessage(requestFailedException.getMessage(), requestFailedException.getHttpStatus());
+            return ServerResponse
+                    .status(requestFailedException.getHttpStatus())
+                    .contentType(APPLICATION_JSON)
+                    .body(Mono.just(new ErrorMessage(requestFailedException.getMessage())), ErrorMessage.class);
         } else {
-            return monoErrorMessage(t.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
+            return ServerResponse
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(APPLICATION_JSON)
+                    .body(Mono.just(new ErrorMessage(t.toString())), ErrorMessage.class);
         }
     }
 
@@ -92,26 +98,15 @@ public abstract class Handler<Request, Response> {
         }
     }
 
-    protected static ResponsePublisher errorMessage(String message, HttpStatus httpStatus) {
-        return new ResponsePublisher<>(Mono.just(new ErrorMessage(message)),
-                ErrorMessage.class,
-                httpStatus);
-    }
-
-    protected static Mono<ResponsePublisher> monoErrorMessage(String message, HttpStatus httpStatus) {
-        return Mono.just(errorMessage(message, httpStatus));
-    }
 
     public Mono<ServerResponse> handle(ServerRequest request) {
         Mono<Request> indexImageRequestMono = request.body(requestExtractor);
-        Mono<ResponsePublisher> responsePublisherMono = computeResponse(indexImageRequestMono);
-        return responsePublisherMono.flatMap(responsePublisher -> ServerResponse
-                .status(responsePublisher.status)
-                .contentType(APPLICATION_JSON)
-                .body(responsePublisher.resultMono, responsePublisher.responseClass));
+        return computeResponse(indexImageRequestMono)
+                .flatMap(response -> response.getServerResponse())
+                .onErrorResume(t -> handleError(t));
     }
 
-    protected abstract Mono<ResponsePublisher> computeResponse(Mono<Request> indexImageRequestMono);
+    protected abstract Mono<Response> computeResponse(Mono<Request> indexImageRequestMono);
 
     public static class ErrorMessage {
         public String message;
