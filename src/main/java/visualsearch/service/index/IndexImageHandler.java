@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
-import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
 import visualsearch.service.Handler;
 import visualsearch.service.ResponsePublisher;
@@ -40,69 +39,53 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
 
     @Override
     protected Mono<ResponsePublisher> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
-        return indexImageRequestMono.flatMap(indexImageRequest -> {
-            if (indexImageRequest.imageUrl == null) {
-                return monoErrorMessage("imageUrl was not specified in request", HttpStatus.BAD_REQUEST);
-            } else {
-                try {
-                    Mono<ImageRetrieveService.ImageResponse> imageResponseMono = imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest(indexImageRequest.imageUrl));
-                    return imageResponseMono.flatMap(clientResponse -> {
-                        if (clientResponse.statusCode() != HttpStatus.OK) {
-                            return monoErrorMessage("fetching image returned error", clientResponse.statusCode());
-                        } else {
-                            try {
-                                ProcessedImage.Builder resultBuilder = ProcessedImage.builder();
-                                resultBuilder.imageUrl(indexImageRequest.imageUrl);
-                                ProcessedImage processedImage = ProcessImage.getProcessingResult(clientResponse.body(), resultBuilder);
-                                return storeResultInElasticsearch(processedImage);
-                            } catch (IOException e) {
-                                return monoErrorMessage("Unable to handle image: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
-                            }
-                        }
-                    });
-                } catch (Exception e) {
-                    return monoErrorMessage("fetching image failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-        });
+        return indexImageRequestMono
+                .flatMap(searchImageRequest ->
+                        fetchImage(searchImageRequest.imageUrl))
+                .map(imageResponse -> processImage(imageResponse))
+                .flatMap(processedImage -> storeResultInElasticsearch(processedImage))
+                .map(result -> convertEsResponseToResponse(result))
+                .onErrorResume(t -> handleError(t));
     }
 
 
-    private Mono<ResponsePublisher> storeResultInElasticsearch(ProcessedImage processedImage) {
-        String documentBody;
-        try {
-            documentBody = imageToJsonDocument(processedImage);
-        } catch (JsonProcessingException e) {
-            return monoErrorMessage("Unable to serialize image: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    private Mono<ElasticService.ElasticResponse> storeResultInElasticsearch(ProcessedImage processedImage) {
+        String documentBody = imageToJsonDocument(processedImage);
         Mono<ElasticService.ElasticResponse> elasticResponseMono = elasticService.post(documentBody);
         return elasticResponseMono.map(elasticResponse -> {
             if (elasticResponse.getHttpStatus() != HttpStatus.CREATED) {
-                return errorMessage("Unable to write visualsearch.image processing result to elastic", elasticResponse.getHttpStatus());
+                throw new RequestFailedException(elasticResponse.getHttpStatus(), "Cannot write to elastic.");
             }
-            // get the id from request
-            try {
-                IndexImageResponse response = convertEsResponseToResponse(elasticResponse);
-                return new ResponsePublisher<>(Mono.just(response),
-                        IndexImageResponse.class,
-                        elasticResponse.getHttpStatus());
-            } catch (IOException e) {
-                return errorMessage("Unable to parse response from elastic: " + e.toString(), HttpStatus.INTERNAL_SERVER_ERROR);
-            }
+            return elasticResponse;
         });
     }
 
-    private IndexImageResponse convertEsResponseToResponse(ElasticService.ElasticResponse elasticResponse) throws IOException {
-        HashMap<String, Object> result =
-                new ObjectMapper().readValue(elasticResponse.getBody(), HashMap.class);
+    private ResponsePublisher convertEsResponseToResponse(ElasticService.ElasticResponse elasticResponse) {
+        IndexImageResponse response = createResponse(elasticResponse);
+        return new ResponsePublisher<>(Mono.just(response),
+                IndexImageResponse.class,
+                elasticResponse.getHttpStatus());
+    }
+
+    private IndexImageResponse createResponse(ElasticService.ElasticResponse elasticResponse) {
+        HashMap<String, Object> result;
+        try {
+            result = new ObjectMapper().readValue(elasticResponse.getBody(), HashMap.class);
+        } catch (IOException e) {
+            throw new RequestFailedException(HttpStatus.INTERNAL_SERVER_ERROR, e, "Cannot parse elastic response.");
+        }
         String id = (String) result.get("_id");
         IndexImageResponse response = new IndexImageResponse();
         response._id = id;
         return response;
     }
 
-    private String imageToJsonDocument(ProcessedImage processedImage) throws JsonProcessingException {
-        return new ObjectMapper().writeValueAsString(processedImage);
+    private String imageToJsonDocument(ProcessedImage processedImage) {
+        try {
+            return new ObjectMapper().writeValueAsString(processedImage);
+        } catch (JsonProcessingException e) {
+            throw new RequestFailedException(HttpStatus.INTERNAL_SERVER_ERROR, e, "Could not serialize processed image: ");
+        }
     }
 
 }

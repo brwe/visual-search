@@ -124,7 +124,7 @@ public class ApiIntegTest {
                 .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.NOT_FOUND)
-                .expectBody(String.class).isEqualTo("{\"message\":\"fetching image returned error\"}");
+                .expectBody(String.class).isEqualTo("{\"message\":\"Could not fetch image.\"}");
     }
 
     @Test
@@ -137,7 +137,7 @@ public class ApiIntegTest {
                 .body(Mono.just("{\"image_url1\": \"https://123.jpg\"}"), String.class)
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.BAD_REQUEST)
-                .expectBody().jsonPath("message").isEqualTo("imageUrl was not specified in request");
+                .expectBody().jsonPath("message").isEqualTo("imageUrl was not specified in request.");
     }
 
     @Test

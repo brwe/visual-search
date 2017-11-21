@@ -87,7 +87,7 @@ public class IndexImageHandlerTest {
         assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageHandler.ErrorMessage.class));
         assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageHandler.ErrorMessage.class));
         IndexImageHandler.ErrorMessage response = (IndexImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("fetching image failed: No can do."));
+        assertThat(response.message, equalTo("java.lang.IllegalArgumentException: No can do."));
     }
 
     @Test
@@ -106,7 +106,7 @@ public class IndexImageHandlerTest {
         assertThat(imageIndexServerResponse.responseClass, equalTo(IndexImageHandler.ErrorMessage.class));
         assertThat(imageIndexServerResponse.resultMono.block(), instanceOf(IndexImageHandler.ErrorMessage.class));
         IndexImageHandler.ErrorMessage response = (IndexImageHandler.ErrorMessage) imageIndexServerResponse.resultMono.block();
-        assertThat(response.message, equalTo("fetching image returned error"));
+        assertThat(response.message, equalTo("Could not fetch image."));
     }
 
 }
