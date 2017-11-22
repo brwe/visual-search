@@ -51,10 +51,14 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import static io.netty.handler.codec.http.HttpHeaders.Values.APPLICATION_JSON;
+import static junit.framework.TestCase.assertTrue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.arrayContaining;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.mockito.Mockito.doReturn;
@@ -147,10 +151,13 @@ public class ElasticStoreIntegTest {
                 HashMap<String, Object> source = (HashMap<String, Object>) hit.get("_source");
                 assertThat(source.get("imageUrl"), equalTo(DUMMY_IMAGE_URL));
                 assertThat(source.get("receivedBytes"), equalTo(processedImage.receivedBytes));
+                assertThat(source.get("dHash"), instanceOf(Map.class));
+                Map<String, Boolean> dHash = (Map<String, Boolean>) source.get("dHash");
+                for (int i = 0; i < 64; i++) {
+                    assertTrue(dHash.keySet().contains("dh_" + i));
+                }
             }
-
         }
-
     }
 
     @Test

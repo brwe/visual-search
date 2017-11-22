@@ -16,26 +16,32 @@
 
 package visualsearch.image;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class ProcessedImage {
     public final int receivedBytes;
     public final String imageUrl;
     public int numPixels = 0;
+    public final Map<String, Boolean> dHash;
 
 
-    protected ProcessedImage(int receivedBytes, String imageUrl, int numPixels) {
+    protected ProcessedImage(int receivedBytes, String imageUrl, int numPixels, Map<String,Boolean> dHash) {
         this.receivedBytes = receivedBytes;
         this.imageUrl = imageUrl;
         this.numPixels = numPixels;
+        this.dHash = dHash;
     }
 
     public static class Builder {
         int capacity = 0;
         String imageUrl;
         int numPixels;
+        Map<String, Boolean> dHash = new HashMap();
 
         public ProcessedImage build() {
             assert (imageUrl != null);
-            return new ProcessedImage(capacity, imageUrl, numPixels);
+            return new ProcessedImage(capacity, imageUrl, numPixels, dHash);
         }
 
         public Builder capacity(int capacity) {
@@ -51,6 +57,12 @@ public class ProcessedImage {
         public Builder numPixels(int numPixels) {
             this.numPixels = numPixels;
             return this;
+        }
+
+        public void dHash(boolean[] hashBits) {
+            for (int i = 0; i < hashBits.length; i++) {
+                dHash.put("dh_" + i, hashBits[i]);
+            }
         }
     }
 

@@ -19,9 +19,9 @@ package visualsearch.image;
 
 import com.sun.imageio.plugins.jpeg.JPEGImageReader;
 import com.sun.imageio.plugins.jpeg.JPEGImageReaderSpi;
-import org.apache.commons.codec.binary.Base64;
 
 import javax.imageio.stream.MemoryCacheImageInputStream;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -29,15 +29,46 @@ import java.nio.ByteBuffer;
 
 public class ProcessImage {
     public static ProcessedImage getProcessingResult(ByteBuffer b, ProcessedImage.Builder builder) throws IOException {
-        assert Base64.isBase64(b.array()) == false;
+        BufferedImage img = byteBufferToBufferedImage(b);
+        builder.capacity(b.capacity()).build();
+        builder.numPixels(img.getWidth() * img.getHeight());
+        builder.dHash(dHash(img));
+        return builder.build();
+    }
+
+    public static boolean[] dHash(BufferedImage img) {
+        return pixelDiffsLeftToRight(shrinkImage(img));
+    }
+
+    public static BufferedImage byteBufferToBufferedImage(ByteBuffer b) throws IOException {
         JPEGImageReaderSpi spi = new JPEGImageReaderSpi();
         JPEGImageReader imageReader = new JPEGImageReader(spi);
         MemoryCacheImageInputStream memoryCacheImageInputStream = new MemoryCacheImageInputStream(new ByteArrayInputStream(b.array()));
         imageReader.setInput(memoryCacheImageInputStream);
-        BufferedImage img = imageReader.read(0);
-        builder.capacity(b.capacity()).build();
-        builder.numPixels(img.getWidth() * img.getHeight());
-        return builder.build();
+        return imageReader.read(0);
     }
 
+
+    public static boolean[] pixelDiffsLeftToRight(BufferedImage outputImage) {
+        boolean[] result = new boolean[64];
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                int current = outputImage.getRaster().getSample(i, j, 0);
+                int next = outputImage.getRaster().getSample(i, j + 1, 0);
+                result[i * 8 + j] = current < next;
+            }
+        }
+        return result;
+    }
+
+    public static BufferedImage shrinkImage(BufferedImage inputImage) {
+        BufferedImage outputImage = new BufferedImage(8,
+                9, BufferedImage.TYPE_BYTE_GRAY);
+
+        // scales the input image to the output image
+        Graphics2D g2d = outputImage.createGraphics();
+        g2d.drawImage(inputImage, 0, 0, 8, 9, null);
+        g2d.dispose();
+        return outputImage;
+    }
 }
