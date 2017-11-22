@@ -80,13 +80,13 @@ public class ElasticStoreIntegTest {
     @BeforeClass
     public static void setElasticEnv() {
         System.setProperty(ELASTIC_HOST, "localhost");
-        System.setProperty(ELASTIC_PORT, "9200");
+        System.setProperty(ELASTIC_PORT, "9208");
     }
 
     @ClassRule
     public static DockerComposeRule docker = DockerComposeRule.builder()
             .file("src/test/resources/docker-compose-elasticsearch.yml")
-            .waitingForService("elasticsearch", HealthChecks.toHaveAllPortsOpen())
+            .waitingForService("elasticsearch-test", HealthChecks.toHaveAllPortsOpen())
             .build();
 
     @Before
