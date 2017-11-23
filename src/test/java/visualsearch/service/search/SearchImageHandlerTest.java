@@ -21,7 +21,6 @@ import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 import visualsearch.image.ProcessImage;
 import visualsearch.image.ProcessedImage;
-import visualsearch.service.index.IndexImageResponse;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
@@ -41,19 +40,8 @@ import static visualsearch.service.HelperMethods.getImageClientResponse;
 public class SearchImageHandlerTest {
 
     @Test
-    public void testQueryFromProcessedImage() {
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(DUMMY_IMAGE_URL).capacity(20).build());
-        assertThat(query, equalTo("{\"query\":{\"function_score\":{\"functions\":[{\"gauss\":{\"receivedBytes\":{\"origin\":20,\"scale\":5}}}]}}}"));
-    }
-
-    @Test
-    public void testQueryFromProcessedImageCanHandleLessThat4Bytes() {
-        String query = SearchImageHandler.generateQuery(ProcessedImage.builder().imageUrl(DUMMY_IMAGE_URL).capacity(3).build());
-        assertThat(query, equalTo("{\"query\":{\"function_score\":{\"functions\":[{\"gauss\":{\"receivedBytes\":{\"origin\":3,\"scale\":0.75}}}]}}}"));
-    }
-
-    @Test
     public void testElasticsearchResponseIsReturned() throws IOException {
+        SearchImageRequest searchImageRequest = new SearchImageRequest(DUMMY_IMAGE_URL, 10);
 
         // mock the image retrieval
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
@@ -64,20 +52,21 @@ public class SearchImageHandlerTest {
 
         // mock elasticsearch
         ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponse.block().body(), ProcessedImage.builder().imageUrl(fetchImageRequest.imageUrl));
-        String queryBody = SearchImageHandler.generateQuery(processedImage);
+        String queryBody = SearchImageHandler.generateQuery(processedImage, searchImageRequest);
         ElasticService elasticService = mock(ElasticService.class);
         doReturn(createElasticSearchResponse(Duration.ZERO, HttpStatus.OK))
                 .when(elasticService).search(queryBody);
 
         SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, elasticService);
-        SearchImageRequest searchImageRequest = new SearchImageRequest();
-        searchImageRequest.imageUrl = DUMMY_IMAGE_URL;
+
         SearchImageResponse searchImageResponse = imageHandler.computeResponse(Mono.just(searchImageRequest)).block();
         assertThat(searchImageResponse.response, equalTo("{ this is really irrelevant because we only pass on the elasticsearch response here }"));
     }
 
     @Test
     public void testImageRetrieveException() throws IOException {
+        SearchImageRequest searchImageRequest = new SearchImageRequest(DUMMY_IMAGE_URL, 10);
+
         // mock image retrieval
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
@@ -85,8 +74,6 @@ public class SearchImageHandlerTest {
                 when(imageRetrieveService).fetchImage(fetchImageRequest);
         SearchImageHandler imageHandler = new SearchImageHandler(imageRetrieveService, null);
 
-        SearchImageRequest searchImageRequest = new SearchImageRequest();
-        searchImageRequest.imageUrl = DUMMY_IMAGE_URL;
         try {
             imageHandler.computeResponse(Mono.just(searchImageRequest)).block();
             fail();

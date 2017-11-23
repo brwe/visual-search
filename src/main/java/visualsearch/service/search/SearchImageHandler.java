@@ -25,6 +25,8 @@ import visualsearch.service.Handler;
 import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 @Component
 public class SearchImageHandler extends Handler<SearchImageRequest, SearchImageResponse> {
 
@@ -34,15 +36,19 @@ public class SearchImageHandler extends Handler<SearchImageRequest, SearchImageR
 
     @Override
     protected Mono<SearchImageResponse> computeResponse(Mono<SearchImageRequest> searchImageRequestMono) {
+        AtomicReference<SearchImageRequest> searchImageRequestAtomicReference = new AtomicReference<>();
         return searchImageRequestMono
-                .flatMap(searchImageRequest ->
-                        fetchImage(searchImageRequest.imageUrl))
+                .flatMap(searchImageRequest -> {
+                    searchImageRequestAtomicReference.set(searchImageRequest);
+                    return fetchImage(searchImageRequest.imageUrl);
+                })
                 .map(imageResponse -> processImage(imageResponse))
-                .flatMap(processedImage -> searchSimilarImages(processedImage));
+                .flatMap(processedImage -> searchSimilarImages(processedImage, searchImageRequestAtomicReference));
     }
 
-    private Mono<SearchImageResponse> searchSimilarImages(ProcessedImage processedImage) {
-        String queryBody = generateQuery(processedImage);
+    private Mono<SearchImageResponse> searchSimilarImages(ProcessedImage processedImage, AtomicReference<SearchImageRequest> searchImageRequestAtomicReference) {
+        SearchImageRequest searchImageRequest = searchImageRequestAtomicReference.get();
+        String queryBody = generateQuery(processedImage, searchImageRequest);
         Mono<ElasticService.ElasticResponse> elasticResponseMono = elasticService.search(queryBody);
         return elasticResponseMono.map(elasticResponse -> {
             if (elasticResponse.getHttpStatus() != HttpStatus.OK) {
@@ -55,21 +61,25 @@ public class SearchImageHandler extends Handler<SearchImageRequest, SearchImageR
         });
     }
 
-    public static String generateQuery(ProcessedImage processedImage) {
-        double scale = processedImage.receivedBytes / 4.0;
-        assert scale > 0.0;
+    public static String generateQuery(ProcessedImage processedImage, SearchImageRequest searchImageRequest) {
+        JSONObject[] matchCauses = new JSONObject[processedImage.dHash.size()];
+        int i = 0;
+        for (String key : processedImage.dHash.keySet()) {
+            matchCauses[i] =
+                    new JSONObject()
+                            .put("constant_score", new JSONObject()
+                                    .put("query", new JSONObject()
+                                            .put("match",
+                                                    new JSONObject()
+                                                            .put("dHash." + key, processedImage.dHash.get(key))
+                                            )));
+            i++;
+        }
         String jsonString = new JSONObject()
                 .put("query", new JSONObject()
-                        .put("function_score", new JSONObject()
-                                .put("functions", new JSONObject[]{
-                                        new JSONObject()
-                                                .put("gauss", new JSONObject()
-                                                .put("receivedBytes", new JSONObject()
-                                                        .put("origin", processedImage.receivedBytes)
-                                                        .put("scale", scale))
-                                        )
-                                })
-                        )
+                        .put("bool", new JSONObject()
+                                .put("minimum_should_match", searchImageRequest.minimumShouldMatch)
+                                .put("should", matchCauses))
                 )
                 .toString();
         return jsonString;

@@ -19,6 +19,15 @@ package visualsearch.service.search;
 
 public class SearchImageRequest {
     public String imageUrl;
+    public int minimumShouldMatch;
+
+    public SearchImageRequest(String imageUrl, int minimumShouldMatch) {
+        this.imageUrl = imageUrl;
+        this.minimumShouldMatch = minimumShouldMatch;
+    }
+
+    public SearchImageRequest() {
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -27,12 +36,14 @@ public class SearchImageRequest {
 
         SearchImageRequest that = (SearchImageRequest) o;
 
+        if (minimumShouldMatch != that.minimumShouldMatch) return false;
         return imageUrl != null ? imageUrl.equals(that.imageUrl) : that.imageUrl == null;
     }
 
     @Override
     public int hashCode() {
-        return imageUrl != null ? imageUrl.hashCode() : 0;
+        int result = imageUrl != null ? imageUrl.hashCode() : 0;
+        result = 31 * result + minimumShouldMatch;
+        return result;
     }
-
 }
