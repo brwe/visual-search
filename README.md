@@ -36,11 +36,20 @@ will store the following document in elasticsearch:
 ````
 {
     "receivedBytes": 9423,
-    "imageUrl": "http://www.drstuspodcast.com/wp-content/uploads/2017/05/Move-Along-2.jpg"
+    "imageUrl": "http://www.drstuspodcast.com/wp-content/uploads/2017/05/Move-Along-2.jpg",
+    "dHash": {
+        dh_0 : true,
+        dh_1 : false,
+        ...
+        
+    }
 }
 ````
 
-and return its elasticsearch id:
+dHash is computed as described [here](http://www.hackerfactor.com/blog/index.php?/archives/529-Kind-of-Like-That.html).
+ 
+
+Returns the elasticsearch id:
 ````
 {
     "_id": "AV_F2mX47zsWila-6evq"
@@ -55,13 +64,14 @@ To find similar images call:
 POST /image_search
 {
     "imageUrl": "... for example http://www.drstuspodcast.com/wp-content/uploads/2017/05/Move-Along-2.jpg"
+    "minimumShouldMatch": 10
 }
 
 ```
 
 This will
  - fetch the image
- - extract some features
+ - extract same features as with storing
  - generate an elasticsearch query from the features
  - query elastic and return the resulting search response
  
@@ -93,7 +103,7 @@ This will
             ...
 ```
 
-Currently the query is just a function score query that ranks images by how many bytes they contain, the closer to the query image the better:
+Currently the query is a bool query that compares the hash fields. The more match the better:
 
 ```
 {
