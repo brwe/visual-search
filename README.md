@@ -160,7 +160,10 @@ $./setup.sh
 $docker-compose up index-open-images-test-set
 ```
 
-
+To process locally stored images call 
+```
+./start_with_local_images.sh IMAGE_DIRECTORY
+```
 
 # Build
 
