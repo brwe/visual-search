@@ -108,22 +108,33 @@ Currently the query is a bool query that compares the hash fields. The more matc
 ```
 {
   "query": {
-    "function_score": {
-      "functions": [
+    "bool": {
+      "minimum_should_match": 10,
+      "should": [
         {
-          "gauss": {
-            "receivedBytes": {
-              "origin": 113344,
-              "scale": 10000
+          "constant_score": {
+            "query": {
+              "match": {
+                "dHash.dh_1": false
+              }
             }
           }
-        }
-      ]
-    }
-  }
-}
+        },
+        {
+          "constant_score": {
+            "query": {
+              "match": {
+                "dHash.dh_2": true
+              }
+            }
+          }
+        },
+        {
+          "constant_score": {
+          ...
 ```
 
+`minimum_should_match` is set to the `minimumShouldMatch` in the search request.
 # Run locally
 
 The local setup runs in docker containers.
