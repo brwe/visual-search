@@ -19,6 +19,7 @@ package visualsearch.service.index;
 
 public class IndexImageRequest {
     public String imageUrl;
+    public String image;
 
     @Override
     public boolean equals(Object o) {
@@ -27,16 +28,14 @@ public class IndexImageRequest {
 
         IndexImageRequest that = (IndexImageRequest) o;
 
-        return imageUrl != null ? imageUrl.equals(that.imageUrl) : that.imageUrl == null;
+        if (imageUrl != null ? !imageUrl.equals(that.imageUrl) : that.imageUrl != null) return false;
+        return image != null ? image.equals(that.image) : that.image == null;
     }
 
     @Override
     public int hashCode() {
-        return imageUrl != null ? imageUrl.hashCode() : 0;
-    }
-
-    public IndexImageRequest setUrl(String url) {
-        this.imageUrl = url;
-        return this;
+        int result = imageUrl != null ? imageUrl.hashCode() : 0;
+        result = 31 * result + (image != null ? image.hashCode() : 0);
+        return result;
     }
 }

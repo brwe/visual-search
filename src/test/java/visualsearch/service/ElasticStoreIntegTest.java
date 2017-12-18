@@ -24,7 +24,6 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.BasicHttpEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -66,7 +65,6 @@ import static visualsearch.service.HelperMethods.DUMMY_IMAGE_URL;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
 import static visualsearch.service.services.ElasticService.ELASTIC_HOST;
 import static visualsearch.service.services.ElasticService.ELASTIC_PORT;
-import static visualsearch.service.services.ElasticService.INDEX;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -114,7 +112,7 @@ public class ElasticStoreIntegTest {
     @Test
     public void testIndexImage() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
         doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
         ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(""));
@@ -166,7 +164,7 @@ public class ElasticStoreIntegTest {
 
 
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
         doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
         ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponseMono.block().body(), ProcessedImage.builder().imageUrl(DUMMY_IMAGE_URL));

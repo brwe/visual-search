@@ -27,7 +27,9 @@ import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Base64;
 
 import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -38,6 +40,7 @@ import static org.mockito.Mockito.mock;
 import static visualsearch.service.HelperMethods.DUMMY_IMAGE_URL;
 import static visualsearch.service.HelperMethods.createElasticPutResponse;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
+import static visualsearch.service.HelperMethods.getTestImageBytes;
 
 public class IndexImageHandlerTest {
 
@@ -45,7 +48,7 @@ public class IndexImageHandlerTest {
     public void testJsonResponseContainsId() throws IOException {
         // mock the image retrieval
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponse = getImageClientResponse(Duration.ZERO);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponse = getImageClientResponse(Duration.ZERO);
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
         doReturn(imageResponse)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
@@ -64,6 +67,29 @@ public class IndexImageHandlerTest {
         IndexImageHandler imageHandler = new IndexImageHandler(imageRetrieveService, elasticService);
         IndexImageRequest indexImageRequest = new IndexImageRequest();
         indexImageRequest.imageUrl = DUMMY_IMAGE_URL;
+        IndexImageResponse imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
+        assertThat(imageIndexServerResponse._id, equalTo(elasticId));
+    }
+
+
+    @Test
+    public void testJsonResponseContainsIdWithoutUrl() throws IOException {
+        byte[] imageBytes = getTestImageBytes();
+        // mock elasticsearch
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(ByteBuffer.wrap(imageBytes), ProcessedImage.builder().imageUrl("none"));
+        String elasticId = "123";
+        String storedBody = new ObjectMapper()
+                .writeValueAsString(processedImage);
+        ElasticService elasticService = mock(ElasticService.class);
+        doReturn(createElasticPutResponse(Duration.ZERO, HttpStatus.CREATED, elasticId))
+                .when(elasticService).post(storedBody);
+
+        // now check that the response actually contains the id
+        IndexImageHandler imageHandler = new IndexImageHandler(null, elasticService);
+        IndexImageRequest indexImageRequest = new IndexImageRequest();
+        indexImageRequest.imageUrl = null;
+        indexImageRequest.image = Base64.getEncoder().encodeToString(imageBytes);
+
         IndexImageResponse imageIndexServerResponse = imageHandler.computeResponse(Mono.just(indexImageRequest)).block();
         assertThat(imageIndexServerResponse._id, equalTo(elasticId));
     }

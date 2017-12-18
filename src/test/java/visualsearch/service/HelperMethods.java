@@ -24,6 +24,7 @@ import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -32,17 +33,27 @@ public class HelperMethods {
 
     public static final String DUMMY_IMAGE_URL = "http://iwishidlearnedsomethingotherthanprogramming.com";
 
-    public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration, HttpStatus httpStatus) throws IOException {
+    public static Mono<ImageRetrieveService.ImageFetchResponse> getImageClientResponse(Duration duration, HttpStatus httpStatus) throws IOException {
         ByteBuffer byteBuffer;
         try (FileInputStream fileInputStream = new FileInputStream(new File("src/test/resources/nginx/data/test.jpg"))) {
             byte[] imageBytes = IOUtils.toByteArray(fileInputStream);
             byteBuffer = ByteBuffer.wrap(imageBytes);
         }
-        ImageRetrieveService.ImageResponse imageResponse = new ImageRetrieveService.ImageResponse(byteBuffer, httpStatus, DUMMY_IMAGE_URL);
+        ImageRetrieveService.ImageFetchResponse imageResponse = new ImageRetrieveService.ImageFetchResponse(byteBuffer, httpStatus, DUMMY_IMAGE_URL);
         return Mono.just(imageResponse).delayElement(duration);
     }
 
-    public static Mono<ImageRetrieveService.ImageResponse> getImageClientResponse(Duration duration) throws IOException {
+    public static Mono<ImageRetrieveService.ImageFetchResponse> getImageClientRequest(Duration duration, HttpStatus httpStatus) throws IOException {
+        ByteBuffer byteBuffer;
+        try (FileInputStream fileInputStream = new FileInputStream(new File("src/test/resources/nginx/data/test.jpg"))) {
+            byte[] imageBytes = IOUtils.toByteArray(fileInputStream);
+            byteBuffer = ByteBuffer.wrap(imageBytes);
+        }
+        ImageRetrieveService.ImageFetchResponse imageResponse = new ImageRetrieveService.ImageFetchResponse(byteBuffer, httpStatus, DUMMY_IMAGE_URL);
+        return Mono.just(imageResponse).delayElement(duration);
+    }
+
+    public static Mono<ImageRetrieveService.ImageFetchResponse> getImageClientResponse(Duration duration) throws IOException {
         return getImageClientResponse(duration, HttpStatus.OK);
     }
 
@@ -62,5 +73,11 @@ public class HelperMethods {
 
     public static Mono<ElasticService.ElasticResponse> createElasticPutResponse(HttpStatus httpStatus) throws IOException {
         return createElasticPutResponse(Duration.ZERO, httpStatus, "123");
+    }
+
+    public static byte[] getTestImageBytes() throws IOException {
+        try (FileInputStream fileInputStream = new FileInputStream(new File("src/test/resources/nginx/data/test.jpg"))) {
+            return IOUtils.toByteArray(fileInputStream);
+        }
     }
 }

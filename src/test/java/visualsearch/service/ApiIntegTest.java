@@ -36,8 +36,10 @@ import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -55,6 +57,7 @@ import static visualsearch.service.HelperMethods.DUMMY_IMAGE_URL;
 import static visualsearch.service.HelperMethods.createElasticPutResponse;
 import static visualsearch.service.HelperMethods.createElasticSearchResponse;
 import static visualsearch.service.HelperMethods.getImageClientResponse;
+import static visualsearch.service.HelperMethods.getTestImageBytes;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -89,7 +92,7 @@ public class ApiIntegTest {
     @Test
     public void testIndexImageNoFailures() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
         doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
 
@@ -104,6 +107,29 @@ public class ApiIntegTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just("{\"imageUrl\": \"" + DUMMY_IMAGE_URL + "\"}"), String.class)
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.CREATED)
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
+        HashMap<String, Object> bodyMap = new ObjectMapper().readValue(bodyString, HashMap.class);
+        assertThat(bodyMap.get("_id"), instanceOf(String.class));
+    }
+
+    @Test
+    public void testIndexImageWithoutUrlNoFailures() throws IOException {
+        byte[] imageBytes = getTestImageBytes();
+        ProcessedImage processedImage = ProcessImage.getProcessingResult(ByteBuffer.wrap(imageBytes), ProcessedImage.builder().imageUrl("none"));
+        String storedBody = new ObjectMapper().writeValueAsString(processedImage);
+        doReturn(createElasticPutResponse(HttpStatus.CREATED))
+                .when(elasticService).post(storedBody);
+
+        String bodyString = this.webClient
+                .post()
+                .uri("/image")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(Mono.just("{\"image\": \"" + Base64.getEncoder().encodeToString(imageBytes) + "\"}"), String.class)
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.CREATED)
                 .expectBody(String.class)
@@ -145,7 +171,7 @@ public class ApiIntegTest {
     @Test
     public void testIndexImageParallel() throws InterruptedException, IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ofSeconds(1));
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponseMono = getImageClientResponse(Duration.ofSeconds(1));
         doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
 
@@ -203,7 +229,7 @@ public class ApiIntegTest {
     @Test
     public void testImageSearch() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponseMono = getImageClientResponse(Duration.ZERO);
         doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
 
@@ -226,7 +252,7 @@ public class ApiIntegTest {
     @Test
     public void testImageResponseWithSearchRelayed() throws IOException {
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponseMono = getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponseMono = getImageClientResponse(Duration.ZERO, HttpStatus.NOT_FOUND);
         doReturn(imageResponseMono)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
 

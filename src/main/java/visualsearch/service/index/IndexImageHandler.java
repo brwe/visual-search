@@ -27,6 +27,8 @@ import visualsearch.service.services.ElasticService;
 import visualsearch.service.services.ImageRetrieveService;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Base64;
 import java.util.HashMap;
 
 @Component
@@ -40,7 +42,16 @@ public class IndexImageHandler extends Handler<IndexImageRequest, IndexImageResp
     protected Mono<IndexImageResponse> computeResponse(Mono<IndexImageRequest> indexImageRequestMono) {
         return indexImageRequestMono
                 .flatMap(searchImageRequest ->
-                        fetchImage(searchImageRequest.imageUrl))
+                {
+                    if (searchImageRequest.image != null) {
+                        byte[] imageBytes = Base64.getMimeDecoder().decode(searchImageRequest.image);
+                        ByteBuffer byteBuffer = ByteBuffer.wrap(imageBytes);
+                        ImageRetrieveService.ImageFetchResponse imageResponse = new ImageRetrieveService.ImageFetchResponse(byteBuffer, HttpStatus.OK, "none");
+                        return Mono.just(imageResponse);
+                    } else {
+                        return fetchImage(searchImageRequest.imageUrl);
+                    }
+                })
                 .map(imageResponse -> processImage(imageResponse))
                 .flatMap(processedImage -> storeResultInElasticsearch(processedImage))
                 .map(result -> convertEsResponseToResponse(result));

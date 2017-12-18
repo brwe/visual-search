@@ -47,16 +47,16 @@ public class ImageRetrieveService implements AutoCloseable {
     }
 
 
-    public Mono<ImageRetrieveService.ImageResponse> fetchImage(FetchImageRequest request) {
+    public Mono<ImageFetchResponse> fetchImage(FetchImageRequest request) {
 
-        return Mono.<ImageResponse>create(sink -> {
+        return Mono.<ImageFetchResponse>create(sink -> {
             FutureCallback<HttpResponse> callback = new FutureCallback<HttpResponse>() {
 
                 @Override
                 public void completed(HttpResponse result) {
 
                     try {
-                        sink.success(new ImageResponse(ByteBuffer.wrap(EntityUtils.toByteArray(result.getEntity())), HttpStatus.resolve(result.getStatusLine().getStatusCode()), request.imageUrl));
+                        sink.success(new ImageFetchResponse(ByteBuffer.wrap(EntityUtils.toByteArray(result.getEntity())), HttpStatus.resolve(result.getStatusLine().getStatusCode()), request.imageUrl));
                     } catch (IOException e) {
                         sink.error(e);
                     }
@@ -80,13 +80,13 @@ public class ImageRetrieveService implements AutoCloseable {
         });
     }
 
-    public static class ImageResponse {
+    public static class ImageFetchResponse {
 
         private final ByteBuffer body;
         private final HttpStatus statusCode;
         private final String imageUrl;
 
-        public ImageResponse(ByteBuffer body, HttpStatus statusCode, String imageUrl) {
+        public ImageFetchResponse(ByteBuffer body, HttpStatus statusCode, String imageUrl) {
 
             this.body = body;
             this.statusCode = statusCode;

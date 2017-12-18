@@ -67,7 +67,7 @@ public class ImageRetrieveIntegTest {
     @Test
     public void testTestImageIsProcessedCorrectly() throws IOException {
         try (ImageRetrieveService imageRetrieveService = new ImageRetrieveService()) {
-            ImageRetrieveService.ImageResponse imageResponse = imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest("http://localhost/test.jpg")).block();
+            ImageRetrieveService.ImageFetchResponse imageResponse = imageRetrieveService.fetchImage(new ImageRetrieveService.FetchImageRequest("http://localhost/test.jpg")).block();
             ProcessedImage processedImage = ProcessImage.getProcessingResult(imageResponse.body(), ProcessedImage.builder().imageUrl("http://localhost/test.jpg"));
             assertThat(processedImage.receivedBytes, equalTo(11389));
         }

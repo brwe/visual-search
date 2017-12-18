@@ -64,7 +64,7 @@ public abstract class Handler<Request, Response extends AbstractResponse> {
         }
     }
 
-    protected Mono<ImageRetrieveService.ImageResponse> fetchImage(String imageUrl) {
+    protected Mono<ImageRetrieveService.ImageFetchResponse> fetchImage(String imageUrl) {
         if (imageUrl == null) {
             throw new SearchImageHandler.RequestFailedException(HttpStatus.BAD_REQUEST, "imageUrl was not specified in request.");
         } else {
@@ -72,7 +72,7 @@ public abstract class Handler<Request, Response extends AbstractResponse> {
         }
     }
 
-    protected static ProcessedImage processImage(ImageRetrieveService.ImageResponse imageResponse) {
+    protected static ProcessedImage processImage(ImageRetrieveService.ImageFetchResponse imageResponse) {
         if (imageResponse.statusCode() != HttpStatus.OK) {
             throw new SearchImageHandler.RequestFailedException(imageResponse.statusCode(), "Could not fetch image.");
         } else {
@@ -82,7 +82,7 @@ public abstract class Handler<Request, Response extends AbstractResponse> {
         }
     }
 
-    protected static ProcessedImage processImage(ImageRetrieveService.ImageResponse imageResponse, ProcessedImage.Builder resultBuilder) {
+    protected static ProcessedImage processImage(ImageRetrieveService.ImageFetchResponse imageResponse, ProcessedImage.Builder resultBuilder) {
         try {
             return ProcessImage.getProcessingResult(imageResponse.body(), resultBuilder);
         } catch (IOException e) {

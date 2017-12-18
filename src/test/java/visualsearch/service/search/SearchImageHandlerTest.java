@@ -45,7 +45,7 @@ public class SearchImageHandlerTest {
 
         // mock the image retrieval
         ImageRetrieveService.FetchImageRequest fetchImageRequest = new ImageRetrieveService.FetchImageRequest(DUMMY_IMAGE_URL);
-        Mono<ImageRetrieveService.ImageResponse> imageResponse = getImageClientResponse(Duration.ZERO);
+        Mono<ImageRetrieveService.ImageFetchResponse> imageResponse = getImageClientResponse(Duration.ZERO);
         ImageRetrieveService imageRetrieveService = mock(ImageRetrieveService.class);
         doReturn(imageResponse)
                 .when(imageRetrieveService).fetchImage(fetchImageRequest);
